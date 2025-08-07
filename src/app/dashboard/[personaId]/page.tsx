@@ -22,9 +22,11 @@ interface ScorePanelData {
   score: number | null;
   tips: string[];
   messageCount: number;
+  usageInfo?: {
+    totalMessagesUsed: number;
+    maxMessagesPerIP: number;
+  } | null;
 }
-
-
 
 export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
   const resolvedParams = React.use(params);
@@ -34,6 +36,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
   const [currentScore, setCurrentScore] = useState<number | null>(null);
   const [currentTips, setCurrentTips] = useState<string[]>([]);
   const [messageCount, setMessageCount] = useState(0);
+  const [usageInfo, setUsageInfo] = useState<ScorePanelData['usageInfo']>(null);
   const [hasLoadedScorePanelData, setHasLoadedScorePanelData] = useState(false);
   const [hasTrainingHistory, setHasTrainingHistory] = useState(false);
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
@@ -50,12 +53,14 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
         setCurrentScore(panelData.score);
         setCurrentTips(panelData.tips || []);
         setMessageCount(panelData.messageCount || 0);
+        setUsageInfo(panelData.usageInfo || null);
       } else {
         // Reset state for new persona with no saved data
         console.log(`No ScorePanel data found for persona ${resolvedParams.personaId}, resetting state`);
         setCurrentScore(null);
         setCurrentTips([]);
         setMessageCount(0);
+        setUsageInfo(null);
       }
       setHasLoadedScorePanelData(true);
     } catch (error) {
@@ -64,6 +69,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
       setCurrentScore(null);
       setCurrentTips([]);
       setMessageCount(0);
+      setUsageInfo(null);
       setHasLoadedScorePanelData(true);
     }
   }, [resolvedParams.personaId]);
@@ -114,12 +120,13 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
         score: currentScore,
         tips: currentTips,
         messageCount: messageCount,
+        usageInfo: usageInfo,
       };
       localStorage.setItem(dataKey, JSON.stringify(panelData));
     } catch (error) {
       console.error('Failed to save score panel data:', error);
     }
-  }, [resolvedParams.personaId, currentScore, currentTips, messageCount]);
+  }, [resolvedParams.personaId, currentScore, currentTips, messageCount, usageInfo]);
 
   // Save score panel data whenever relevant state changes (but only after initial load)
   useEffect(() => {
@@ -128,8 +135,6 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
       saveScorePanelData();
     }
   }, [saveScorePanelData, resolvedParams.personaId, hasLoadedScorePanelData]);
-
-
 
   // Handle score and tips updates from ChatWindow
   const handleScoreUpdate = useCallback((score: number | null, tips: string[]) => {
@@ -145,17 +150,29 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
     setHasTrainingHistory(count > 1);
   }, []);
 
+  // Handle usage info updates from ChatWindow
+  const handleUsageInfoUpdate = useCallback((usage: ScorePanelData['usageInfo']) => {
+    setUsageInfo(usage);
+  }, []);
+
   // Handle clear training history
   const handleClearTrainingHistory = useCallback(() => {
     if (clearPersonaHistory(resolvedParams.personaId)) {
-      // Reset score panel data
+      // Reset score panel data (but keep usage info since it's IP-based)
       setCurrentScore(null);
       setCurrentTips([]);
       setMessageCount(0);
+      // Don't reset usageInfo - it's IP-based and should persist
       setHasTrainingHistory(false);
       
-      // Clear score panel data from localStorage
+      // Clear score panel data from localStorage (but preserve usage info)
+      const currentUsageInfo = usageInfo; // Save current usage info
       localStorage.removeItem(`scorePanel_${resolvedParams.personaId}`);
+      
+      // Restore usage info after clearing localStorage
+      if (currentUsageInfo) {
+        setUsageInfo(currentUsageInfo);
+      }
       
       // Trigger chat window refresh
       setChatRefreshKey(prev => prev + 1);
@@ -176,7 +193,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
         duration: 5000
       });
     }
-  }, [resolvedParams.personaId, showToast]);
+  }, [resolvedParams.personaId, showToast, usageInfo]);
 
   // Check for training history
   useEffect(() => {
@@ -199,8 +216,6 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
     
     checkTrainingHistory();
   }, [resolvedParams.personaId, messageCount]);
-
-
 
   if (loading) {
     return (
@@ -233,6 +248,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             personaId={resolvedParams.personaId} 
             onScoreUpdate={handleScoreUpdate}
             onMessageCountUpdate={handleMessageCountUpdate}
+            onUsageInfoUpdate={handleUsageInfoUpdate}
           />
         </div>
 
@@ -242,6 +258,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             score={currentScore}
             tips={currentTips}
             messageCount={messageCount}
+            usageInfo={usageInfo}
             onClearHistory={handleClearTrainingHistory}
             hasTrainingHistory={hasTrainingHistory}
           />
@@ -267,6 +284,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             personaId={resolvedParams.personaId} 
             onScoreUpdate={handleScoreUpdate}
             onMessageCountUpdate={handleMessageCountUpdate}
+            onUsageInfoUpdate={handleUsageInfoUpdate}
           />
         </div>
 
@@ -277,6 +295,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             score={currentScore}
             tips={currentTips}
             messageCount={messageCount}
+            usageInfo={usageInfo}
             onClearHistory={handleClearTrainingHistory}
             hasTrainingHistory={hasTrainingHistory}
           />

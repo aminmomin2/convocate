@@ -2,7 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Lightbulb, Target, Trash2 } from 'lucide-react';
+import { TrendingUp, Lightbulb, Target, Trash2, Info } from 'lucide-react';
+import { getUsageInfo } from '@/utils/fetcher';
 
 interface ScorePanelProps {
   isMobile?: boolean;
@@ -11,6 +12,10 @@ interface ScorePanelProps {
   messageCount?: number;
   onClearHistory?: () => void;
   hasTrainingHistory?: boolean;
+  usageInfo?: {
+    totalMessagesUsed: number;
+    maxMessagesPerIP: number;
+  } | null;
 }
 
 export default function ScorePanel({ 
@@ -19,12 +24,16 @@ export default function ScorePanel({
   tips = [], 
   messageCount = 0,
   onClearHistory,
-  hasTrainingHistory = false
+  hasTrainingHistory = false,
+  usageInfo = null
 }: ScorePanelProps) {
   // Use provided score or default
   const outcomeScore = score ?? 0;
   const hasTips = tips.length > 0;
   const hasScore = score !== null;
+  
+  // Get centralized usage info if not provided
+  const centralizedUsageInfo = usageInfo || getUsageInfo();
 
   return (
     <div className={`space-y-4 ${isMobile ? '' : 'h-full flex flex-col'}`}>
@@ -127,22 +136,33 @@ export default function ScorePanel({
         </CardContent>
       </Card>
 
-      {/* Additional Stats (Desktop only) */}
-      {!isMobile && messageCount > 0 && (
-        <Card className="flex-shrink-0">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Chat Stats</CardTitle>
+      {/* Usage Limits Info */}
+      {centralizedUsageInfo && (
+        <Card className="flex-shrink-0 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+          <CardHeader className={`${isMobile ? 'pb-2' : 'pb-3'}`}>
+            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-700 dark:text-blue-300`}>
+              <Info className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'}`} />
+              Usage Limits
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary">{messageCount}</p>
-              <p className="text-sm text-muted-foreground">Messages Exchanged</p>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-blue-600 dark:text-blue-400">Total Messages:</span>
+              <Badge variant="outline" className="text-blue-700 dark:text-blue-400">
+                {centralizedUsageInfo.totalMessagesUsed}/{centralizedUsageInfo.maxMessagesPerIP}
+              </Badge>
             </div>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+              {centralizedUsageInfo.totalMessagesUsed >= centralizedUsageInfo.maxMessagesPerIP 
+                ? "Message limit reached. No more chatting allowed for this IP."
+                : "Message limit is per IP address and cannot be reset by clearing history."
+              }
+            </p>
           </CardContent>
         </Card>
       )}
 
-            {/* Clear Training History Button */}
+      {/* Clear Training History Button */}
       {onClearHistory && (
         <Card className="flex-shrink-0 border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20">
           <CardHeader className={`${isMobile ? 'pb-3' : 'pb-4'}`}>

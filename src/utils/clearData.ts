@@ -11,7 +11,9 @@ export const clearAllData = () => {
       'chatHistory',
       'scorePanelData',
       'uploadedFiles',
-      'sessionId'
+      'sessionId',
+      'usageInfo', // Clear usage info since API doesn't rely on it
+      'totalPersonasCreated' // Legacy key that might exist
     ];
     
     keysToRemove.forEach(key => {

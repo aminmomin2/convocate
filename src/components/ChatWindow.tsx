@@ -3,14 +3,26 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Send } from 'lucide-react';
 import { ChatMessage, StoredPersona, Msg } from '@/types/persona';
+import { updateTotalMessagesUsed } from '@/utils/fetcher';
+
+const MAX_MESSAGE_LENGTH = 4000; // Match the API limit
 
 interface ChatWindowProps {
   personaId: string;
   onScoreUpdate?: (score: number | null, tips: string[]) => void;
   onMessageCountUpdate?: (count: number) => void;
+  onUsageInfoUpdate?: (usage: {
+    totalMessagesUsed: number;
+    maxMessagesPerIP: number;
+  } | null) => void;
 }
 
-export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpdate }: ChatWindowProps) {
+interface UsageInfo {
+  totalMessagesUsed: number;
+  maxMessagesPerIP: number;
+}
+
+export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpdate, onUsageInfoUpdate }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [trainingMessageCount, setTrainingMessageCount] = useState<number>(0);
@@ -20,6 +32,8 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
   const [currentScore, setCurrentScore] = useState<number | null>(null);
   const [currentTips, setCurrentTips] = useState<string[]>([]);
   const [showSamplePrompts, setShowSamplePrompts] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Sample prompts that will be shown to users
@@ -162,6 +176,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
 
     // Hide sample prompts when user sends a message
     setShowSamplePrompts(false);
+    setError(''); // Clear any previous errors
 
     const userMessage = inputValue.trim();
     setInputValue('');
@@ -212,11 +227,11 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Chat API error: ${response.status}`);
-      }
-
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Chat API error: ${response.status}`);
+      }
 
       // Add persona response to chat
       const personaResponse: ChatMessage = {
@@ -246,6 +261,16 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
         setCurrentTips(data.tips);
       }
       
+      // Update usage information if provided
+      if (data.usage) {
+        setUsageInfo(data.usage);
+        // Save to centralized storage
+        updateTotalMessagesUsed(data.usage.totalMessagesUsed);
+        if (onUsageInfoUpdate) {
+          onUsageInfoUpdate(data.usage);
+        }
+      }
+      
       // Notify parent component of score/tips update
       if (onScoreUpdate) {
         onScoreUpdate(
@@ -260,7 +285,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
       // Add error message to chat
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: "I'm sorry, I'm having trouble responding right now. Please try again.",
+        content: error instanceof Error ? error.message : "I'm sorry, I'm having trouble responding right now. Please try again.",
         sender: 'persona',
         timestamp: new Date(),
       };
@@ -268,6 +293,9 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
       const finalMessages = [...updatedMessages, errorMessage];
       setMessages(finalMessages);
       saveChatHistory(finalMessages);
+      
+      // Set error state for display
+      setError(error instanceof Error ? error.message : 'Failed to send message');
     } finally {
       setIsLoading(false);
     }
@@ -288,11 +316,17 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
     if (value.trim() && showSamplePrompts) {
       setShowSamplePrompts(false);
     }
+    
+    // Clear error when user starts typing
+    if (value.trim() && error) {
+      setError('');
+    }
   };
 
   const handleSamplePromptClick = (prompt: string) => {
     setInputValue(prompt);
     setShowSamplePrompts(false);
+    setError(''); // Clear any errors when starting fresh
   };
 
   return (
@@ -310,10 +344,30 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
             </Badge>
           )}
         </div>
+        
+        {/* Usage Information */}
+        {usageInfo && (
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span>Total Messages: {usageInfo.totalMessagesUsed}/{usageInfo.maxMessagesPerIP}</span>
+          </div>
+        )}
       </div>
 
       {/* Messages Area - Scrollable */}
-      <div className="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto p-4 space-y-4 scrollbar-hide" style={{ top: '90px', bottom: '90px' }}>
+      <div className="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto p-4 space-y-4 scrollbar-hide" style={{ top: usageInfo ? '120px' : '90px', bottom: '90px' }}>
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-2 text-red-800 mb-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-medium">Chat Error</span>
+            </div>
+            <p className="text-red-700 text-sm">{error}</p>
+          </div>
+        )}
+
         {/* Sample Prompts at the top */}
         {showSamplePrompts && messages.length === 0 && (
           <div className="mb-6">
@@ -384,6 +438,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
             placeholder="Type your response..."
             className="flex-1 min-h-[40px] max-h-[120px] px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none overflow-y-auto scrollbar-hide"
             rows={1}
+            maxLength={MAX_MESSAGE_LENGTH}
             style={{
               height: 'auto',
               minHeight: '40px',
@@ -410,9 +465,14 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
             )}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Press Enter to send, Shift+Enter for new line
-        </p>
+        <div className="flex justify-between items-center mt-2">
+          <p className="text-xs text-muted-foreground">
+            Press Enter to send, Shift+Enter for new line
+          </p>
+          <p className={`text-xs ${inputValue.length > MAX_MESSAGE_LENGTH * 0.9 ? 'text-orange-600' : 'text-muted-foreground'}`}>
+            {inputValue.length}/{MAX_MESSAGE_LENGTH}
+          </p>
+        </div>
       </div>
     </div>
   );

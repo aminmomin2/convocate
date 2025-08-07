@@ -12,7 +12,43 @@ interface ChatRequestBody {
   styleProfile: StyleProfile;
 }
 
+const MAX_MESSAGES_PER_IP = 40; // 40 total messages per IP
+const MAX_MESSAGE_LENGTH = 4000; // Prevent extremely long messages
+const MAX_CONTEXT_MESSAGES = 20; // Total context messages limit
+
+// In-memory throttle tracking
+const ipMessageCounts = new Map<string, number>();
+
+// Helper function to create a unique key for deduplication
+function createMessageKey(message: Msg): string {
+  return `${message.sender}:${message.message}`;
+}
+
+// Helper function to deduplicate messages
+function deduplicateMessages(messages: Msg[]): Msg[] {
+  const seen = new Set<string>();
+  return messages.filter(msg => {
+    const key = createMessageKey(msg);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function POST(req: Request) {
+  const xff = req.headers.get("x-forwarded-for") || "unknown";
+  const ip = xff?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+
+  // Check total message limit per IP
+  const totalMessagesUsed = ipMessageCounts.get(ip) || 0;
+  if (totalMessagesUsed >= MAX_MESSAGES_PER_IP) {
+    return NextResponse.json({ 
+      error: `You've reached the maximum number of messages per IP (${MAX_MESSAGES_PER_IP} messages). This limit is permanent and cannot be reset.` 
+    }, { status: 429 });
+  }
+
   try {
     const { personaName, transcript, chatHistory, userMessage, styleProfile } =
       (await req.json()) as ChatRequestBody;
@@ -29,69 +65,101 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
-    // Build context with strong “stay-in-character” framing
-    const contextMessages: ChatCompletionMessageParam[] = [
-      {
-        role: 'system',
-        content: `
-        You are now playing the role of ${personaName}. 
-        Based solely on the conversation examples below, reply exactly as ${personaName} would—do not introduce any new information or break character.
-        Only use the tone, wording, and style reflected in these examples.
-        `.trim()
-      },
-      // last 15 transcript turns
-      ...transcript
-        .slice(-15)
-        .map((m) => ({
-          role: (m.sender === personaName ? 'assistant' : 'user') as 'assistant' | 'user',
-          content: m.message
-        })),
-      // full session history
-      ...chatHistory.map((m) => ({
+    // Validate message length to prevent expensive API calls
+    if (userMessage.length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json({ 
+        error: `Message too long. Maximum length is ${MAX_MESSAGE_LENGTH} characters.` 
+      }, { status: 400 });
+    }
+
+    // Deduplicate transcript and chat history separately first
+    const deduplicatedTranscript = deduplicateMessages(transcript);
+    const deduplicatedChatHistory = deduplicateMessages(chatHistory);
+
+    // Build context messages with proportional split (20 turns total)
+    const TRANSCRIPT_RESERVED = 10; // Reserve 10 turns for transcript examples
+    const CHAT_HISTORY_RESERVED = 10; // Reserve 10 turns for chat history
+    
+    const transcriptMessages = deduplicatedTranscript
+      .slice(-TRANSCRIPT_RESERVED)
+      .map((m) => ({
         role: (m.sender === personaName ? 'assistant' : 'user') as 'assistant' | 'user',
         content: m.message
-      }))
-    ];
+      }));
+    
+    const chatHistoryMessages = deduplicatedChatHistory
+      .slice(-CHAT_HISTORY_RESERVED)
+      .map((m) => ({
+        role: (m.sender === personaName ? 'assistant' : 'user') as 'assistant' | 'user',
+        content: m.message
+      }));
 
-    // Append the new user query
-    const fullChatMessages: ChatCompletionMessageParam[] = [
-      ...contextMessages,
-      { role: 'user', content: userMessage }
-    ];
+    // Combine and deduplicate final context messages
+    const allContextMessages = [...transcriptMessages, ...chatHistoryMessages];
+    const seenContext = new Set<string>();
+    const finalContextMessages: ChatCompletionMessageParam[] = [];
+    
+    for (const msg of allContextMessages) {
+      const key = `${msg.role}:${msg.content}`;
+      if (!seenContext.has(key)) {
+        seenContext.add(key);
+        finalContextMessages.push(msg);
+      }
+    }
 
-    console.log(fullChatMessages);
+    // Limit total context messages to prevent token overflow
+    const limitedContextMessages = finalContextMessages.slice(-MAX_CONTEXT_MESSAGES);
 
-    // Main conversation call
+    console.log('Context messages (deduplicated):', limitedContextMessages.length);
+
+    // 2a) Main Conversation Call
     const chatRes = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: fullChatMessages
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `
+You are now acting as ${personaName}.
+Use only the tone, wording, and style from this profile:
+• Tone: ${styleProfile.tone}
+• Formality: ${styleProfile.formality}
+• Pacing: ${styleProfile.pacing}
+• Vocabulary: ${styleProfile.vocabulary.join(", ")}
+• Quirks: ${styleProfile.quirks.join(", ")}
+Reply exactly as ${personaName} would—do not invent new info or break character.
+      `.trim()
+        },
+        // Deduplicated context messages
+        ...limitedContextMessages,
+        { role: "user", content: userMessage }
+      ]
     });
     const twinReply = chatRes.choices?.[0]?.message?.content?.trim() ?? '';
 
-    // Scoring & tips call with explicit JSON schema enforcement
+    // 2b) Scoring & Tips Call
     const scoreRes = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'system',
-          content: `
-    You are an expert conversation evaluator.
-    Here is ${personaName}'s style profile:
-    
-    Tone: ${styleProfile.tone}
-    Formality: ${styleProfile.formality}
-    Pacing: ${styleProfile.pacing}
-    Common vocabulary: ${styleProfile.vocabulary.join(', ')}
-    Quirks: ${styleProfile.quirks.join(', ')}
-    Example messages: ${styleProfile.examples.join(' | ')}
-    
-    Now rate how well this reply matches that style and its overall positivity on a scale from 0–100, then give exactly three concise tips for improvement.
-    Respond *only* with JSON in the form:
-    {"score": number, "tips": [string, string, string]}
-          `.trim()
-        },
-        { role: 'user', content: twinReply }
-      ]
+      model: "gpt-3.5-turbo",
+  messages: [
+    {
+      role: "system",
+      content: `
+You are an expert conversation coach.
+Here is ${personaName}'s style profile:
+
+Tone: ${styleProfile.tone}  
+Formality: ${styleProfile.formality}  
+Pacing: ${styleProfile.pacing}  
+Vocabulary: ${styleProfile.vocabulary.join(", ")}  
+Quirks: ${styleProfile.quirks.join(", ")}  
+Examples: ${styleProfile.examples.join(" | ")}
+
+Now evaluate the AI's last reply for positivity & style-match (0–100) and give exactly three concise tips for improvement.
+Respond *only* with JSON in this form:
+{"score": number, "tips": [string, string, string]}
+      `.trim()
+    },
+    { role: "user", content: twinReply }
+  ]
     });
 
     // Parse JSON safely
@@ -117,12 +185,21 @@ export async function POST(req: Request) {
       timestamp: new Date().toISOString()
     };
 
+    // Update counter
+    ipMessageCounts.set(ip, totalMessagesUsed + 1);
+
     return NextResponse.json({
       twinReply,
       score,
       tips,
       userMessage: userMsg,
-      personaMessage: personaMsg
+      personaMessage: personaMsg,
+      // Include usage information for frontend
+      usage: {
+        totalMessagesUsed: totalMessagesUsed + 1,
+        maxMessagesPerIP: MAX_MESSAGES_PER_IP,
+        contextMessagesUsed: limitedContextMessages.length
+      }
     });
   } catch (err: unknown) {
     console.error('[chat/route] Error:', err);

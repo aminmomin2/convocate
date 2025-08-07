@@ -3,9 +3,13 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { StoredPersona } from '@/types/persona';
 import { clearAllData, clearPersonaHistory } from '@/utils/clearData';
 import { useToast } from '@/components/ui/toast';
+
+const MAX_PERSONAS_PER_IP = 2;
+const MAX_MESSAGES_PER_IP = 40;
 
 export default function Dashboard() {
   const { showToast } = useToast();
@@ -88,6 +92,14 @@ export default function Dashboard() {
     }
   };
 
+  // Calculate total messages across all personas
+  const totalMessages = personas.reduce((total, persona) => {
+    return total + (persona.chatHistory?.length || 0);
+  }, 0);
+
+  const canCreateMorePersonas = personas.length < MAX_PERSONAS_PER_IP;
+  const hasActiveSessions = personas.some(p => p.chatHistory?.length > 0);
+
   if (loading) {
     return (
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6 flex items-center justify-center">
@@ -112,7 +124,7 @@ export default function Dashboard() {
               <p className="text-lg text-muted-foreground">
                 Choose a sales persona to train with and improve your skills
               </p>
-              {personas.some(p => p.chatHistory?.length > 0) && (
+              {hasActiveSessions && (
                 <div className="mt-4 flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-sm text-muted-foreground">
@@ -139,6 +151,36 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* Usage Limits Info */}
+        {personas.length > 0 && (
+          <div className="mb-6">
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+              <CardContent>
+                <div className="flex items-center gap-2 text-blue-800 dark:text-blue-300 mb-3">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-medium">Usage Limits</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 dark:text-blue-400">Personas:</span>
+                    <Badge variant="outline" className="text-blue-700 dark:text-blue-400">
+                      {personas.length}/{MAX_PERSONAS_PER_IP}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700 dark:text-blue-400">Total Messages:</span>
+                    <Badge variant="outline" className="text-blue-700 dark:text-blue-400">
+                      {totalMessages}/{MAX_MESSAGES_PER_IP}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Clear All Data Confirmation Modal */}
         {showClearConfirm && (
@@ -193,57 +235,59 @@ export default function Dashboard() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {personas.map((persona) => (
-              <Card key={persona.id} className="group hover:shadow-lg hover:scale-102 transition-all duration-300 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                <CardHeader className="text-center pb-4">
-                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                    {persona.avatar ? (
-                      <img 
-                        src={persona.avatar} 
-                        alt={persona.name}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-slate-600 dark:bg-slate-500 flex items-center justify-center">
-                        <span className="text-white font-semibold text-xl">
-                          {persona.name.charAt(0)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <CardTitle className="text-xl text-slate-900 dark:text-white">{persona.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center space-y-4">
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {persona.description}
-                  </p>
-                  
-                  {/* Stats */}
-                  <div className="flex justify-center gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      <span>{persona.transcript?.length || 0} messages</span>
+          <div className="space-y-6">
+            {/* Personas Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {personas.map((persona) => (
+                <Card key={persona.id} className="group hover:shadow-lg hover:scale-102 transition-all duration-300 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                  <CardHeader className="text-center pb-4">
+                    <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                      {persona.avatar ? (
+                        <img 
+                          src={persona.avatar} 
+                          alt={persona.name}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-slate-600 dark:bg-slate-500 flex items-center justify-center">
+                          <span className="text-white font-semibold text-xl">
+                            {persona.name.charAt(0)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {persona.chatHistory?.length > 0 && (
-                      <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <CardTitle className="text-xl text-slate-900 dark:text-white">{persona.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center space-y-4">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {persona.description}
+                    </p>
+                    
+                    {/* Stats */}
+                    <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                        <span>{persona.chatHistory.length} training</span>
+                        <span>{persona.transcript?.length || 0} messages</span>
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Link href={`/dashboard/${persona.id}`} className="flex-1">
-                      <Button className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 cursor-pointer">
-                        {persona.chatHistory?.length > 0 ? 'Continue' : 'Start Training'}
-                      </Button>
-                    </Link>
-                                                               <Button
+                      {persona.chatHistory?.length > 0 && (
+                        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>{persona.chatHistory.length} training</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Link href={`/dashboard/${persona.id}`} className="flex-1">
+                        <Button className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 cursor-pointer">
+                          {persona.chatHistory?.length > 0 ? 'Continue' : 'Start Training'}
+                        </Button>
+                      </Link>
+                      <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleDeletePersona(persona.id)}
@@ -254,10 +298,36 @@ export default function Dashboard() {
                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                        </svg>
                      </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Add More Personas Section */}
+            {canCreateMorePersonas && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                  Create Another Persona
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  You can create up to {MAX_PERSONAS_PER_IP} personas: yourself and one other person you chat with. Upload more chat data to create additional training personas.
+                </p>
+                <Link href="/">
+                  <Button variant="outline" size="lg">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Upload More Data
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>

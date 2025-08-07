@@ -69,7 +69,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 min-h-screen flex items-center justify-center">
         {/* Animated Background Pattern */}
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:50px_50px] animate-pulse" />
         <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-transparent to-blue-500/10" />
@@ -79,13 +79,13 @@ export default function Home() {
         <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         
-        <div className="relative flex items-center justify-center h-screen p-4">
-          <div className="w-full max-w-6xl space-y-8">
+        <div className="relative w-full max-w-6xl mx-auto px-4 py-8">
+          <div className="space-y-8">
             {/* Enhanced Header */}
             <div className={`text-center space-y-6 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               {/* Title */}
               <div className="space-y-4">
-                <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight">
+                <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white tracking-tight">
                   <span className="bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
                     Convocate
                   </span>
@@ -100,7 +100,7 @@ export default function Home() {
                 <p className="text-sm text-gray-400 font-medium">Practice sales pitches, difficult conversations, or chat with AI clones of friends, colleagues, or mentors</p>
                 
                 {/* Enhanced Key Benefits */}
-                <div className="flex flex-wrap justify-center gap-4">
+                <div className="flex flex-wrap justify-center gap-3">
                   <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 shadow-lg hover:bg-white/20 transition-all duration-300">
                     <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
                     <span>Digital twins of anyone</span>
@@ -120,7 +120,7 @@ export default function Home() {
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 max-w-lg mx-auto">
                 <div className="text-sm text-gray-300 text-center space-y-1">
                   <div className="font-semibold text-white">📊 How Much Data Do You Need?</div>
-                  <div className="flex justify-center items-center gap-6">
+                  <div className="flex justify-center items-center gap-4 flex-wrap">
                     <span><strong>Minimum:</strong> 50 messages</span>
                     <span className="text-gray-400">•</span>
                     <span><strong>Optimal:</strong> 100 messages</span>
