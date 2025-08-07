@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Send } from 'lucide-react';
@@ -19,6 +19,36 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
   const [isLoading, setIsLoading] = useState(false);
   const [currentScore, setCurrentScore] = useState<number | null>(null);
   const [currentTips, setCurrentTips] = useState<string[]>([]);
+  const [showSamplePrompts, setShowSamplePrompts] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Sample prompts that will be shown to users
+  const samplePrompts = [
+    "Hi, I'm calling about your current software solution. Are you experiencing any pain points?",
+    "Good morning! I noticed your company has been growing. How are you handling customer support?",
+    "Hi there! We help companies like yours reduce operational costs by 30%. Interested in learning more?",
+    "Hello! I saw your recent expansion announcement. How are you managing the increased workload?",
+    "Hi, what's your biggest challenge right now when it comes to closing deals?",
+    "Hey, I wanted to get your thoughts on the new project proposal.",
+    "Good afternoon! How's everything going with the team lately?",
+    "I need to talk to you about something important. Do you have a minute?",
+    "What do you think about the feedback I gave you last week?",
+    "Can we discuss the budget concerns I mentioned earlier?"
+  ];
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'end',
+        inline: 'nearest'
+      });
+    }, 100);
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // Load personas and chat history from localStorage on component mount
   useEffect(() => {
@@ -44,51 +74,56 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
           }));
           
           if (chatMessages.length === 0) {
-            // Set default welcome message if no chat history
-            setMessages([{
-              id: '1',
-              content: `Hi! I'm ${persona.name}. I'm here to help you practice your sales skills. What scenario would you like to work on today?`,
-              sender: 'persona',
-              timestamp: new Date(),
-            }]);
+            // No default welcome message - start with empty conversation
+            setMessages([]);
+            // Show sample prompts for new conversations
+            setShowSamplePrompts(true);
+            // Update message count - no real conversation yet
+            if (onMessageCountUpdate) {
+              onMessageCountUpdate(0);
+            }
           } else {
             setMessages(chatMessages);
-          }
-          
-          // Update message count
-          if (onMessageCountUpdate) {
-            onMessageCountUpdate(chatMessages.length);
+            // Hide sample prompts for existing conversations
+            setShowSamplePrompts(false);
+            // Update message count - real conversation exists
+            if (onMessageCountUpdate) {
+              onMessageCountUpdate(chatMessages.length);
+            }
           }
         } else {
           setCurrentPersona(null);
           setTrainingMessageCount(0);
-          setMessages([{
-            id: '1',
-            content: "Hi! I'm here to help you practice your sales skills. What scenario would you like to work on today?",
-            sender: 'persona',
-            timestamp: new Date(),
-          }]);
+          setMessages([]);
+          // Show sample prompts for new conversations
+          setShowSamplePrompts(true);
+          // Update message count - no real conversation
+          if (onMessageCountUpdate) {
+            onMessageCountUpdate(0);
+          }
         }
       } catch (error) {
         console.error('Failed to load chat history:', error);
         setCurrentPersona(null);
         setTrainingMessageCount(0);
-        setMessages([{
-          id: '1',
-          content: "Hi! I'm here to help you practice your sales skills. What scenario would you like to work on today?",
-          sender: 'persona',
-          timestamp: new Date(),
-        }]);
+        setMessages([]);
+        // Show sample prompts for new conversations
+        setShowSamplePrompts(true);
+        // Update message count - no real conversation
+        if (onMessageCountUpdate) {
+          onMessageCountUpdate(0);
+        }
       }
     } else {
       setCurrentPersona(null);
       setTrainingMessageCount(0);
-      setMessages([{
-        id: '1',
-        content: "Hi! I'm here to help you practice your sales skills. What scenario would you like to work on today?",
-        sender: 'persona',
-        timestamp: new Date(),
-      }]);
+      setMessages([]);
+      // Show sample prompts for new conversations
+      setShowSamplePrompts(true);
+      // Update message count - no real conversation
+      if (onMessageCountUpdate) {
+        onMessageCountUpdate(0);
+      }
     }
   }, [personaId, onMessageCountUpdate]);
 
@@ -124,6 +159,9 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || !currentPersona || isLoading) return;
+
+    // Hide sample prompts when user sends a message
+    setShowSamplePrompts(false);
 
     const userMessage = inputValue.trim();
     setInputValue('');
@@ -192,9 +230,12 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
       setMessages(finalMessages);
       saveChatHistory(finalMessages);
       
-      // Update message count
+      // Update message count - exclude welcome message
+      const realMessages = finalMessages.filter(msg => 
+        !(msg.sender === 'persona' && msg.content.includes("I'm here to help you practice"))
+      );
       if (onMessageCountUpdate) {
-        onMessageCountUpdate(finalMessages.length);
+        onMessageCountUpdate(realMessages.length);
       }
 
       // Update score and tips if available
@@ -239,10 +280,25 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+    
+    // Hide sample prompts when user starts typing
+    if (value.trim() && showSamplePrompts) {
+      setShowSamplePrompts(false);
+    }
+  };
+
+  const handleSamplePromptClick = (prompt: string) => {
+    setInputValue(prompt);
+    setShowSamplePrompts(false);
+  };
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full relative bg-background">
       {/* Chat Header */}
-      <div className="p-4 border-b border-border">
+      <div className="absolute top-0 left-0 right-0 p-4 border-b border-border bg-background z-10">
         <h2 className="text-lg font-semibold">Training Session</h2>
         <div className="flex items-center justify-between mb-2">
           <p className="text-sm text-muted-foreground">
@@ -256,8 +312,35 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages Area - Scrollable */}
+      <div className="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto p-4 space-y-4 scrollbar-hide" style={{ top: '90px', bottom: '90px' }}>
+        {/* Sample Prompts at the top */}
+        {showSamplePrompts && messages.length === 0 && (
+          <div className="mb-6">
+            <div className="bg-muted/50 rounded-lg p-4 mb-4">
+              <h3 className="font-semibold text-sm mb-2">🎯 Practice with your digital twin</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Start a conversation with your AI digital twin. It responds exactly like the person you&apos;ve trained it on using real chat/email data. 
+                Perfect for rehearsing sales pitches, practicing difficult conversations, or just chatting with an AI clone of anyone you know.
+                Click any phrase below to begin, or type your own message.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {samplePrompts.map((prompt, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSamplePromptClick(prompt)}
+                  className="text-xs h-auto py-2 px-3 whitespace-normal text-left"
+                >
+                  {prompt}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {messages.map((message) => (
           <div
             key={message.id}
@@ -288,24 +371,37 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-border bg-background">
-        <div className="flex gap-2">
+      {/* Input Area - Fixed at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-background z-10">
+        <div className="flex gap-2 items-end">
           <textarea
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             placeholder="Type your response..."
-            className="flex-1 min-h-[40px] max-h-[120px] px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none"
+            className="flex-1 min-h-[40px] max-h-[120px] px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none overflow-y-auto scrollbar-hide"
             rows={1}
+            style={{
+              height: 'auto',
+              minHeight: '40px',
+              maxHeight: '120px',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+            }}
           />
           <Button 
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
             size="sm"
-            className="px-3"
+            className="px-3 flex-shrink-0"
           >
             {isLoading ? (
               <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

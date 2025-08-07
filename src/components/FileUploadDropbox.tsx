@@ -140,21 +140,21 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
 
   return (
     <Card className="w-full max-w-2xl">
-      <CardHeader>
+      <CardHeader className="mb-2">
         <CardTitle className="flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
-          Upload Chat Files
+          Upload Chat Files To Get Started
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs">
           Upload your chat files to create AI personas for sales training
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 mt-4">
         {/* Dropzone */}
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
             isDragOver 
               ? 'border-primary bg-primary/5' 
               : 'border-muted-foreground/25 hover:border-muted-foreground/50'
@@ -162,6 +162,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          onClick={() => document.getElementById('file-input')?.click()}
         >
           <div className="space-y-4">
             <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center">
@@ -175,13 +176,6 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
                 Supports CSV, JSON, TXT, and XML files
               </p>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => document.getElementById('file-input')?.click()}
-            >
-              Choose Files
-            </Button>
             <input
               id="file-input"
               type="file"
@@ -195,34 +189,21 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
 
         {/* Selected Files */}
         {selectedFiles.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Selected Files</h4>
-            <div className="space-y-2">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
               {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center justify-between bg-muted/30 rounded-md p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                      <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div key={index} className="flex items-center gap-1 bg-muted/50 hover:bg-muted/70 rounded-full px-2 py-1 text-xs transition-colors group">
+                  <span className="truncate max-w-24">{file.name}</span>
+                  <button
                     onClick={() => removeFile(index)}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full w-4 h-4 flex items-center justify-center transition-all duration-200 ml-1 cursor-pointer"
+                    title="Remove file"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </Button>
+                    ×
+                  </button>
                 </div>
               ))}
             </div>
