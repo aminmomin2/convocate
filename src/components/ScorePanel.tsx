@@ -9,7 +9,6 @@ interface ScorePanelProps {
   isMobile?: boolean;
   score?: number | null;
   tips?: string[];
-  messageCount?: number;
   onClearHistory?: () => void;
   hasTrainingHistory?: boolean;
   usageInfo?: {
@@ -22,7 +21,6 @@ export default function ScorePanel({
   isMobile = false, 
   score = null, 
   tips = [], 
-  messageCount = 0,
   onClearHistory,
   hasTrainingHistory = false,
   usageInfo = null

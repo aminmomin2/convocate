@@ -257,7 +257,6 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
           <ScorePanel 
             score={currentScore}
             tips={currentTips}
-            messageCount={messageCount}
             usageInfo={usageInfo}
             onClearHistory={handleClearTrainingHistory}
             hasTrainingHistory={hasTrainingHistory}
@@ -294,7 +293,6 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             isMobile={true}
             score={currentScore}
             tips={currentTips}
-            messageCount={messageCount}
             usageInfo={usageInfo}
             onClearHistory={handleClearTrainingHistory}
             hasTrainingHistory={hasTrainingHistory}

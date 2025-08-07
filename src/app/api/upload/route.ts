@@ -272,58 +272,269 @@ export async function POST(request: Request) {
       const participantMessages = conversation.filter(m => m.sender === participant);
       const styleSample = sampleMessagesEvenly(participantMessages, MAX_STYLE_SAMPLE_LINES);
       
-      // style analysis with structured JSON output
-      const analysisRes = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: `
-      You are a conversation style analyst.
-      Below are ${styleSample.length} evenly sampled messages from ${participant}.
-      Analyze them and respond *only* with valid JSON* matching this schema*:
-      
-      {
-        "tone": string,          // one-sentence summary of overall mood
-        "formality": "formal"|"casual",
-        "pacing": string,        // one-sentence on sentence length & flow
-        "vocabulary": [string],  // 3–5 frequently used words or short phrases
-        "quirks": [string],      // 1–3 idiosyncrasies (emoji, punctuation)
-        "examples": [string]     // 1–2 verbatim snippets illustrating style
-      }
-      
-      Do not include any explanation, extra fields, or markdown—just the JSON.
-            `.trim()
-          },
-          ...styleSample.map(m => ({
-          role: (m.sender === participant ? "assistant" : "user") as "assistant" | "user",
-          content: m.message
-        }))
-      ]
-    });
+      // style analysis with structured JSON output using function calling
+      let raw = "{}";
+      try {
+        const analysisRes = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo-0125",
+            temperature: 0.1,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: `You are a conversation style analyst. Analyze the messages and output a JSON object describing the speaker's communication style.`
+              },
+              {
+                role: "user",
+                content: `Analyze these ${styleSample.length} messages and create a style profile in JSON format:
 
-      // Parse the structured style profile
+${styleSample.map(m => m.message).join("\n")}`
+              }
+            ],
+            functions: [
+              {
+                name: "create_style_profile",
+                description: "Create a style profile from analyzed messages",
+                parameters: {
+                  type: "object",
+                  required: ["tone", "formality", "pacing", "vocabulary", "quirks", "examples", "traits", "emotions", "preferences"],
+                  properties: {
+                    tone: {
+                      type: "string",
+                      description: "The emotional tone of the messages"
+                    },
+                    formality: {
+                      type: "string",
+                      enum: ["formal", "casual"],
+                      description: "Whether the communication style is formal or casual"
+                    },
+                    pacing: {
+                      type: "string",
+                      description: "Description of message timing and length patterns"
+                    },
+                    vocabulary: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Common words and phrases used"
+                    },
+                    quirks: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Unique communication habits"
+                    },
+                    examples: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Representative quotes from the messages"
+                    },
+                    traits: {
+                      type: "object",
+                      description: "Personality traits for more natural conversation",
+                      properties: {
+                        openness: {
+                          type: "number",
+                          description: "1-10: curiosity and openness to new ideas"
+                        },
+                        expressiveness: {
+                          type: "number",
+                          description: "1-10: emotional expressiveness level"
+                        },
+                        humor: {
+                          type: "number",
+                          description: "1-10: tendency to use humor"
+                        },
+                        empathy: {
+                          type: "number",
+                          description: "1-10: ability to show understanding"
+                        }
+                      }
+                    },
+                    emotions: {
+                      type: "object",
+                      description: "Emotional context and triggers",
+                      properties: {
+                        primary: {
+                          type: "string",
+                          description: "Primary emotional state (e.g., enthusiastic, calm, thoughtful)"
+                        },
+                        secondary: {
+                          type: "array",
+                          items: { type: "string" },
+                          description: "Secondary emotions (e.g., curious, playful)"
+                        },
+                        triggers: {
+                          type: "object",
+                          properties: {
+                            positive: {
+                              type: "array",
+                              items: { type: "string" },
+                              description: "Situations that evoke positive responses"
+                            },
+                            negative: {
+                              type: "array",
+                              items: { type: "string" },
+                              description: "Situations that evoke negative responses"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    preferences: {
+                      type: "object",
+                      description: "Conversation preferences and style",
+                      properties: {
+                        topics: {
+                          type: "array",
+                          items: { type: "string" },
+                          description: "Preferred conversation topics"
+                        },
+                        avoids: {
+                          type: "array",
+                          items: { type: "string" },
+                          description: "Topics or approaches to avoid"
+                        },
+                        engagement: {
+                          type: "array",
+                          items: { type: "string" },
+                          description: "Engagement patterns (e.g., asks follow-up questions)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            function_call: { name: "create_style_profile" }
+          });
+
+          raw = analysisRes.choices[0]?.message?.function_call?.arguments || "{}";
+          console.log(`[upload/route] Raw style profile for ${participant}:`, raw);
+        } catch (error) {
+          console.warn(`Failed to generate style profile for ${participant}:`, error);
+          raw = JSON.stringify({
+            tone: "Neutral and professional",
+            formality: "casual",
+            pacing: "Varies with context",
+            vocabulary: [],
+            quirks: [],
+            examples: [],
+            traits: {
+              openness: 5,
+              expressiveness: 5,
+              humor: 5,
+              empathy: 5
+            },
+            emotions: {
+              primary: "neutral",
+              secondary: ["calm"],
+              triggers: {
+                positive: ["friendly interaction"],
+                negative: ["disrespect"]
+              }
+            },
+            preferences: {
+              topics: ["general conversation"],
+              avoids: ["controversial topics"],
+              engagement: ["responds thoughtfully"]
+            }
+          });
+        }
+      
       let styleProfile: StyleProfile;
       try {
-        styleProfile = JSON.parse(analysisRes.choices[0]?.message?.content?.trim() || '{}') as StyleProfile;
+        // Validate that the response starts with { and ends with }
+        if (!raw.startsWith("{") || !raw.endsWith("}")) {
+          throw new Error("Response is not a JSON object");
+        }
         
-        // Validate and provide fallbacks for required fields
-        if (!styleProfile.tone) styleProfile.tone = "Neutral and professional";
-        if (!styleProfile.formality) styleProfile.formality = "casual";
-        if (!styleProfile.pacing) styleProfile.pacing = "Varies with context";
-        if (!Array.isArray(styleProfile.vocabulary)) styleProfile.vocabulary = [];
-        if (!Array.isArray(styleProfile.quirks)) styleProfile.quirks = [];
-        if (!Array.isArray(styleProfile.examples)) styleProfile.examples = [];
+        styleProfile = JSON.parse(raw) as StyleProfile;
+        
+        // Validate required fields and types
+        if (typeof styleProfile.tone !== "string" || !styleProfile.tone) {
+          throw new Error("Missing or invalid tone");
+        }
+        if (styleProfile.formality !== "formal" && styleProfile.formality !== "casual") {
+          throw new Error("Invalid formality value");
+        }
+        if (typeof styleProfile.pacing !== "string" || !styleProfile.pacing) {
+          throw new Error("Missing or invalid pacing");
+        }
+        if (!Array.isArray(styleProfile.vocabulary)) {
+          throw new Error("vocabulary must be an array");
+        }
+        if (!Array.isArray(styleProfile.quirks)) {
+          throw new Error("quirks must be an array");
+        }
+        if (!Array.isArray(styleProfile.examples)) {
+          throw new Error("examples must be an array");
+        }
+
+        // Validate new fields
+        if (!styleProfile.traits || typeof styleProfile.traits !== "object") {
+          throw new Error("traits must be an object");
+        }
+        if (!styleProfile.emotions || typeof styleProfile.emotions !== "object") {
+          throw new Error("emotions must be an object");
+        }
+        if (!styleProfile.preferences || typeof styleProfile.preferences !== "object") {
+          throw new Error("preferences must be an object");
+        }
+
+        // Set default values for optional fields
+        styleProfile.traits = {
+          openness: 5,
+          expressiveness: 5,
+          humor: 5,
+          empathy: 5,
+          ...styleProfile.traits
+        };
+
+        styleProfile.emotions = {
+          primary: "neutral",
+          secondary: [],
+          ...styleProfile.emotions,
+          triggers: {
+            positive: [],
+            negative: [],
+            ...(styleProfile.emotions?.triggers || {})
+          }
+        };
+
+        styleProfile.preferences = {
+          topics: [],
+          avoids: [],
+          engagement: [],
+          ...styleProfile.preferences
+        };
       } catch (error) {
-        console.warn(`Failed to parse style profile for ${participant}:`, error);
-        // Fallback style profile
+        console.warn(`Failed to parse style profile for ${participant}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.warn('Raw response:', raw);
         styleProfile = {
           tone: "Neutral and professional",
           formality: "casual",
           pacing: "Varies with context",
           vocabulary: [],
           quirks: [],
-          examples: []
+          examples: [],
+          traits: {
+            openness: 5,
+            expressiveness: 5,
+            humor: 5,
+            empathy: 5
+          },
+          emotions: {
+            primary: "neutral",
+            secondary: ["calm"],
+            triggers: {
+              positive: ["friendly interaction"],
+              negative: ["disrespect"]
+            }
+          },
+          preferences: {
+            topics: ["general conversation"],
+            avoids: ["controversial topics"],
+            engagement: ["responds thoughtfully"]
+          }
         };
       }
 

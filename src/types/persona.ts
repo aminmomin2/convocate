@@ -13,6 +13,31 @@ export interface StyleProfile {
   vocabulary: string[];   // e.g. ["collaborate", "quick check-in"]
   quirks: string[];       // e.g. ["uses emojis", "ends with question"]
   examples: string[];     // 1–2 real snippets from the transcript
+  
+  // Personality traits for more natural conversation
+  traits: {
+    openness?: number;      // 1-10: curiosity and openness to new ideas
+    expressiveness?: number;// 1-10: emotional expressiveness level
+    humor?: number;         // 1-10: tendency to use humor
+    empathy?: number;       // 1-10: ability to show understanding
+  };
+  
+  // Emotional context
+  emotions: {
+    primary?: string;      // e.g. "enthusiastic", "calm", "thoughtful"
+    secondary?: string[];  // e.g. ["curious", "playful"]
+    triggers?: {           // situations that evoke emotional responses
+      positive?: string[]; // e.g. ["creative ideas", "problem-solving"]
+      negative?: string[]; // e.g. ["rudeness", "confusion"]
+    };
+  };
+  
+  // Conversation style
+  preferences: {
+    topics?: string[];     // preferred conversation topics
+    avoids?: string[];     // topics or approaches to avoid
+    engagement?: string[]; // e.g. ["asks follow-up questions", "shares relevant experiences"]
+  };
 }
 
 export interface StoredMessage {
