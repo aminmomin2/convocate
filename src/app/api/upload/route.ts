@@ -11,6 +11,8 @@ const MAX_FILE_SIZE_MB = 1; // 1MB file size limit
 
 // In-memory throttle tracking
 const ipUsage = new Map<string, number>();
+// Server-side persona storage to prevent deletion workaround
+const ipPersonas = new Map<string, StoredPersona[]>();
 
 // Helper function to get IP with better fallback
 function getClientIP(request: Request): string {
@@ -32,21 +34,6 @@ function getClientIP(request: Request): string {
   }
   
   return ip;
-}
-
-// Helper function to sample messages evenly across transcript
-function sampleMessagesEvenly(messages: Msg[], sampleSize: number): Msg[] {
-  if (messages.length <= sampleSize) return messages;
-  
-  const step = messages.length / sampleSize;
-  const sampled: Msg[] = [];
-  
-  for (let i = 0; i < sampleSize; i++) {
-    const index = Math.floor(i * step);
-    sampled.push(messages[index]);
-  }
-  
-  return sampled;
 }
 
 // Helper function to select top 2 senders by message count
@@ -157,14 +144,132 @@ function groupBySender(msgs: Msg[]): Record<string, Msg[]> {
   }, {} as Record<string, Msg[]>);
 }
 
+// Advanced sampling strategies for better persona accuracy
+function advancedMessageSampling(messages: Msg[], maxSampleSize: number): Msg[] {
+  if (messages.length <= maxSampleSize) return messages;
+  
+  // Quality scoring for messages
+  const scoredMessages = messages.map(msg => ({
+    message: msg,
+    score: calculateMessageQuality(msg)
+  }));
+  
+  // Sort by quality score
+  scoredMessages.sort((a, b) => b.score - a.score);
+  
+  // Multi-criteria sampling
+  const samples: Msg[] = [];
+  
+  // 1. High-quality messages (40%)
+  const highQualityCount = Math.floor(maxSampleSize * 0.4);
+  samples.push(...scoredMessages.slice(0, highQualityCount).map(s => s.message));
+  
+  // 2. Diverse context sampling (30%)
+  const contextSamples = sampleByContext(messages.filter(msg => 
+    !samples.some(sample => sample.message === msg.message)
+  ), Math.floor(maxSampleSize * 0.3));
+  samples.push(...contextSamples);
+  
+  // 3. Behavioral pattern sampling (20%)
+  const behaviorSamples = sampleByBehavior(messages.filter(msg => 
+    !samples.some(sample => sample.message === msg.message)
+  ), Math.floor(maxSampleSize * 0.2));
+  samples.push(...behaviorSamples);
+  
+  // 4. Recent messages (10%)
+  const recentSamples = messages.slice(-Math.floor(maxSampleSize * 0.1)).filter(msg => 
+    !samples.some(sample => sample.message === msg.message)
+  );
+  samples.push(...recentSamples);
+  
+  return samples.slice(0, maxSampleSize);
+}
+
+// Calculate message quality based on multiple factors
+function calculateMessageQuality(msg: Msg): number {
+  let score = 0;
+  
+  // Length factor (moderate length is better)
+  const length = msg.message.length;
+  if (length > 10 && length < 200) score += 3;
+  else if (length >= 200) score += 2;
+  else score += 1;
+  
+  // Engagement factor
+  if (msg.message.includes('?')) score += 2; // Questions
+  if (msg.message.includes('!')) score += 1; // Exclamations
+  if (msg.message.includes('...')) score += 1; // Thoughtful pauses
+  
+  // Vocabulary richness
+  const words = msg.message.split(' ');
+  const uniqueWords = new Set(words.map(w => w.toLowerCase()));
+  const diversity = uniqueWords.size / words.length;
+  score += diversity * 3;
+  
+  // Personality indicators
+  if (msg.message.toLowerCase().includes('lol') || msg.message.toLowerCase().includes('omg')) score += 1;
+  if (msg.message.includes('😊') || msg.message.includes('😂')) score += 1;
+  
+  return score;
+}
+
+// Sample messages by context diversity
+function sampleByContext(messages: Msg[], count: number): Msg[] {
+  const contexts = ['question', 'statement', 'reaction', 'planning', 'casual'];
+  const samples: Msg[] = [];
+  
+  for (const context of contexts) {
+    const contextMessages = messages.filter(msg => {
+      switch (context) {
+        case 'question': return msg.message.includes('?');
+        case 'statement': return msg.message.length > 20 && !msg.message.includes('?');
+        case 'reaction': return msg.message.includes('!') || msg.message.includes('😊') || msg.message.includes('😂');
+        case 'planning': return msg.message.toLowerCase().includes('when') || msg.message.toLowerCase().includes('where') || msg.message.toLowerCase().includes('what time');
+        case 'casual': return msg.message.toLowerCase().includes('lol') || msg.message.toLowerCase().includes('yeah') || msg.message.toLowerCase().includes('nah');
+        default: return false;
+      }
+    });
+    
+    const contextSample = contextMessages.slice(0, Math.ceil(count / contexts.length));
+    samples.push(...contextSample);
+  }
+  
+  return samples.slice(0, count);
+}
+
+// Sample messages by behavioral patterns
+function sampleByBehavior(messages: Msg[], count: number): Msg[] {
+  const behaviors = ['proactive', 'reactive', 'emotional', 'analytical', 'casual'];
+  const samples: Msg[] = [];
+  
+  for (const behavior of behaviors) {
+    const behaviorMessages = messages.filter(msg => {
+      switch (behavior) {
+        case 'proactive': return msg.message.includes('?') || msg.message.toLowerCase().includes('let\'s') || msg.message.toLowerCase().includes('we should');
+        case 'reactive': return msg.message.length < 20 && !msg.message.includes('?');
+        case 'emotional': return msg.message.includes('!') || msg.message.includes('😊') || msg.message.includes('😂') || msg.message.includes('😭');
+        case 'analytical': return msg.message.length > 50 && msg.message.includes('.') && !msg.message.includes('!');
+        case 'casual': return msg.message.toLowerCase().includes('bro') || msg.message.toLowerCase().includes('dude') || msg.message.toLowerCase().includes('lol');
+        default: return false;
+      }
+    });
+    
+    const behaviorSample = behaviorMessages.slice(0, Math.ceil(count / behaviors.length));
+    samples.push(...behaviorSample);
+  }
+  
+  return samples.slice(0, count);
+}
+
 export async function POST(request: Request) {
   const ip = getClientIP(request);
 
-  // Check persona limit per IP
-  const used = ipUsage.get(ip) || 0;
-  if (used >= MAX_PERSONAS_PER_IP) {
+  // Check persona limit per IP using server-side storage - DO THIS FIRST!
+  const existingPersonas = ipPersonas.get(ip) || [];
+  const used = existingPersonas.length;
+  if (used > MAX_PERSONAS_PER_IP) {
     return NextResponse.json({ 
-      error: `You've reached the maximum number of personas per IP (2 personas: yourself + one other person). This limit is permanent and cannot be reset by deleting personas.` 
+      error: `You've exceeded the maximum number of personas per IP (${MAX_PERSONAS_PER_IP} personas: yourself + one other person). You have already created ${used} personas. This limit is permanent and cannot be reset by deleting personas.` 
     }, { status: 429 });
   }
 
@@ -206,6 +311,13 @@ export async function POST(request: Request) {
     // Select top 2 senders by message count
     const selectedBuckets = selectTopSenders(senderBuckets);
     const selectedParticipants = Object.keys(selectedBuckets);
+    
+    // Check if adding these personas would exceed the limit - DO THIS BEFORE EXPENSIVE API CALLS!
+    if (used + selectedParticipants.length > MAX_PERSONAS_PER_IP) {
+      return NextResponse.json({ 
+        error: `Upload would create ${selectedParticipants.length} personas, but you can only have ${MAX_PERSONAS_PER_IP} total (yourself + one other person). You have already created ${used} personas. This limit is permanent and cannot be reset by deleting personas.` 
+      }, { status: 429 });
+    }
     
     // Create conversation with only the top 2 senders
     const filteredMsgs = allMsgs.filter(msg => selectedParticipants.includes(msg.sender));
@@ -258,153 +370,332 @@ export async function POST(request: Request) {
     const conversation = conversationThreads.flat();
     const participants = selectedParticipants;
 
-    // Check if adding this conversation would exceed the limit
-    if (used + 1 > MAX_PERSONAS_PER_IP) {
-      return NextResponse.json({ 
-        error: `Upload would create 1 conversation, but you can only have ${MAX_PERSONAS_PER_IP} total (yourself + one other person). You have already created ${used} personas. This limit is permanent and cannot be reset by deleting personas.` 
-      }, { status: 429 });
-    }
+
 
     // Create personas for each participant with the full conversation as transcript
     const personas: StoredPersona[] = [];
     for (const participant of participants) {
-      // Sample messages from this participant for style analysis
+      // Check if adding this participant would exceed the limit - DO THIS BEFORE EXPENSIVE API CALL!
+      if (used + personas.length >= MAX_PERSONAS_PER_IP) {
+        console.log(`[upload/route] Skipping API call for ${participant} - would exceed limit (${used + personas.length}/${MAX_PERSONAS_PER_IP})`);
+        break; // Stop processing more participants
+      }
+      
+      // Get messages for this participant (cheap operation)
       const participantMessages = conversation.filter(m => m.sender === participant);
-      const styleSample = sampleMessagesEvenly(participantMessages, MAX_STYLE_SAMPLE_LINES);
+      
+      // Sample messages from this participant for style analysis (do this before expensive API call)
+      const styleSample = advancedMessageSampling(participantMessages, MAX_STYLE_SAMPLE_LINES);
       
       // style analysis with structured JSON output using function calling
       let raw = "{}";
       try {
         const analysisRes = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo-0125",
-            temperature: 0.1,
-            response_format: { type: "json_object" },
-            messages: [
-              {
-                role: "system",
-                content: `You are a conversation style analyst. Analyze the messages and output a JSON object describing the speaker's communication style.`
-              },
-              {
-                role: "user",
-                content: `Analyze these ${styleSample.length} messages and create a style profile in JSON format:
+          model: "gpt-3.5-turbo-0125",
+          temperature: 0.1,
+          // remove response_format here
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert communication analyst specializing in authentic text message style profiling. Your task is to analyze message samples and extract the precise, evidence-based communication patterns that make each person unique.
 
-${styleSample.map(m => m.message).join("\n")}`
-              }
-            ],
-            functions: [
-              {
-                name: "create_style_profile",
-                description: "Create a style profile from analyzed messages",
-                parameters: {
-                  type: "object",
-                  required: ["tone", "formality", "pacing", "vocabulary", "quirks", "examples", "traits", "emotions", "preferences"],
-                  properties: {
-                    tone: {
-                      type: "string",
-                      description: "The emotional tone of the messages"
-                    },
-                    formality: {
-                      type: "string",
-                      enum: ["formal", "casual"],
-                      description: "Whether the communication style is formal or casual"
-                    },
-                    pacing: {
-                      type: "string",
-                      description: "Description of message timing and length patterns"
-                    },
-                    vocabulary: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "Common words and phrases used"
-                    },
-                    quirks: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "Unique communication habits"
-                    },
-                    examples: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "Representative quotes from the messages"
-                    },
-                    traits: {
-                      type: "object",
-                      description: "Personality traits for more natural conversation",
-                      properties: {
-                        openness: {
-                          type: "number",
-                          description: "1-10: curiosity and openness to new ideas"
-                        },
-                        expressiveness: {
-                          type: "number",
-                          description: "1-10: emotional expressiveness level"
-                        },
-                        humor: {
-                          type: "number",
-                          description: "1-10: tendency to use humor"
-                        },
-                        empathy: {
-                          type: "number",
-                          description: "1-10: ability to show understanding"
+ANALYSIS FRAMEWORK:
+
+1. VOCABULARY & LANGUAGE PATTERNS:
+   - Identify signature words, phrases, and expressions unique to this person
+   - Note recurring vocabulary choices and word preferences
+   - Analyze formality level and language complexity
+   - Look for distinctive abbreviations, slang, or specialized terms
+   - Measure lexical diversity and word frequency patterns
+   - Context-dependent vocabulary (formal vs casual, work vs personal)
+
+2. COMMUNICATION STYLE:
+   - Message length patterns (short, medium, long, or mixed)
+   - Punctuation habits (standard, minimal, excessive, unique patterns)
+   - Capitalization style (proper, all caps, mixed, or unique patterns)
+   - Emoji usage patterns and frequency
+   - Response timing and pacing indicators
+   - Common typos, abbreviations, or casual language patterns
+   - Natural imperfections and communication quirks
+   - Sentence structure and complexity patterns
+   - Context-dependent style variations
+
+3. PERSONALITY TRAITS THROUGH COMMUNICATION:
+   - Humor style (sarcastic, playful, witty, dry, or none)
+   - Directness level (very direct, diplomatic, evasive, or mixed)
+   - Emotional expressiveness (high, moderate, low, or context-dependent)
+   - Engagement style (proactive, reactive, curious, or passive)
+   - Formality preferences (formal, casual, mixed, or context-dependent)
+   - Communication confidence and assertiveness
+   - Relationship dynamics and social positioning
+
+4. CONVERSATION DYNAMICS:
+   - How they ask questions (direct, indirect, curious, or rare)
+   - How they respond to different topics (enthusiastic, neutral, dismissive)
+   - How they handle disagreements or conflicts
+   - How they show interest or disinterest
+   - How they maintain or change conversation topics
+   - Turn-taking patterns and response timing
+   - Emotional state indicators and triggers
+   - Context switching behavior (work vs personal)
+
+5. DISTINCTIVE QUIRKS:
+   - Unique catchphrases or expressions
+   - Recurring themes or topics they bring up
+   - Communication habits that make them recognizable
+   - Emotional triggers or patterns
+   - Relationship dynamics they establish
+   - Stylometric fingerprints (measurable style signals)
+   - Context-specific behaviors and preferences
+
+6. RELATIONSHIP & CONTEXT ANALYSIS:
+   - How their communication style varies by relationship type
+   - Professional vs personal communication patterns
+   - Emotional state indicators and mood patterns
+   - Power dynamics and social positioning
+   - Trust levels and intimacy indicators
+   - Cultural and background influences
+
+CRITICAL GUIDELINES:
+- Base ALL analysis on actual message content - cite specific examples
+- Don't sanitize or formalize - preserve their real voice exactly as it appears
+- Focus on patterns that would help recreate their authentic communication
+- If insufficient data exists for a trait, mark it as "insufficient data"
+- Prioritize distinctive patterns over generic observations
+- Consider context and relationship dynamics in analysis
+- Look for patterns across different situations and emotional states
+
+Return ONLY via function call with precise, evidence-backed analysis.`
+            },
+            {
+              role: "user",
+              content: `Analyze ${styleSample.length} messages from ${participant} to create a comprehensive communication style profile.
+
+MESSAGE SAMPLE:
+<<<
+${styleSample.map((m, i)=>`[${i+1}] ${m.message}`).join("\n")}
+>>>
+
+ANALYSIS INSTRUCTIONS:
+
+1. VOCABULARY ANALYSIS:
+   - Extract signature words, phrases, and expressions
+   - Note formality level and language complexity
+   - Identify recurring vocabulary patterns
+
+2. COMMUNICATION PATTERNS:
+   - Analyze message length, punctuation, capitalization
+   - Note emoji usage and response patterns
+   - Identify unique communication habits
+
+3. PERSONALITY EXTRACTION:
+   - Determine humor style, directness, expressiveness
+   - Assess engagement style and formality preferences
+   - Identify emotional patterns and triggers
+
+4. CONVERSATION DYNAMICS:
+   - How they ask questions and show interest
+   - How they respond to different topics
+   - How they maintain conversation flow
+
+5. DISTINCTIVE QUIRKS:
+   - Find unique catchphrases or expressions
+   - Note recurring themes or communication habits
+   - Identify what makes their voice recognizable
+
+Provide evidence-based analysis with specific examples from the messages. Return a detailed style profile via function call.`
+            }
+          ],
+          functions: [
+            {
+              name: "create_style_profile",
+              description: "Create a comprehensive communication style profile",
+              parameters: {
+                type: "object",
+                additionalProperties: false,
+                required: [
+                  "tone","formality","pacing","vocabulary","quirks",
+                  "examples","traits","emotions","preferences","communication_patterns"
+                ],
+                properties: {
+                  tone: { 
+                    type: "string", 
+                    maxLength: 400,
+                    description: "Overall communication tone and emotional style (e.g., friendly, direct, sarcastic, formal, casual)"
+                  },
+                  formality: { 
+                    type: "string", 
+                    enum: ["formal","casual","mixed"],
+                    description: "Formality level in communication"
+                  },
+                  pacing: { 
+                    type: "string", 
+                    maxLength: 300,
+                    description: "Communication pacing and response patterns (e.g., quick responses, thoughtful, varied)"
+                  },
+                  vocabulary: {
+                    type: "array",
+                    items: { type: "string", maxLength: 80 },
+                    minItems: 3, maxItems: 15,
+                    description: "Signature words, phrases, and expressions unique to this person"
+                  },
+                  quirks: {
+                    type: "array",
+                    items: { type: "string", maxLength: 120 },
+                    minItems: 1, maxItems: 12,
+                    description: "Distinctive communication habits, catchphrases, or personality quirks"
+                  },
+                  examples: {
+                    type: "array",
+                    items: { type: "string", maxLength: 140 },
+                    minItems: 2, maxItems: 8,
+                    description: "Real message examples that showcase their communication style"
+                  },
+                  traits: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      openness: { type: "number", minimum: 1, maximum: 10 },
+                      expressiveness: { type: "number", minimum: 1, maximum: 10 },
+                      humor: { type: "number", minimum: 1, maximum: 10 },
+                      empathy: { type: "number", minimum: 1, maximum: 10 },
+                      directness: { type: "number", minimum: 1, maximum: 10 },
+                      enthusiasm: { type: "number", minimum: 1, maximum: 10 }
+                    }
+                  },
+                  emotions: {
+                    type: "object",
+                    description: "Emotional context and triggers",
+                    properties: {
+                      primary: {
+                        type: "string",
+                        description: "Primary emotional state (e.g., enthusiastic, calm, thoughtful)"
+                      },
+                      secondary: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Secondary emotions (e.g., curious, playful)"
+                      },
+                      triggers: {
+                        type: "object",
+                        properties: {
+                          positive: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "Situations that evoke positive responses"
+                          },
+                          negative: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "Situations that evoke negative responses"
+                          }
                         }
-                      }
-                    },
-                    emotions: {
-                      type: "object",
-                      description: "Emotional context and triggers",
-                      properties: {
-                        primary: {
-                          type: "string",
-                          description: "Primary emotional state (e.g., enthusiastic, calm, thoughtful)"
-                        },
-                        secondary: {
-                          type: "array",
-                          items: { type: "string" },
-                          description: "Secondary emotions (e.g., curious, playful)"
-                        },
-                        triggers: {
-                          type: "object",
-                          properties: {
-                            positive: {
-                              type: "array",
-                              items: { type: "string" },
-                              description: "Situations that evoke positive responses"
-                            },
-                            negative: {
-                              type: "array",
-                              items: { type: "string" },
-                              description: "Situations that evoke negative responses"
-                            }
+                      },
+                      mood_patterns: {
+                        type: "object",
+                        properties: {
+                          typical_mood: {
+                            type: "string",
+                            description: "Their typical emotional state in conversations"
+                          },
+                          mood_indicators: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "Words or phrases that indicate their mood"
+                          },
+                          stress_indicators: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "How they communicate when stressed or upset"
                           }
                         }
                       }
-                    },
-                    preferences: {
-                      type: "object",
-                      description: "Conversation preferences and style",
-                      properties: {
-                        topics: {
-                          type: "array",
-                          items: { type: "string" },
-                          description: "Preferred conversation topics"
-                        },
-                        avoids: {
-                          type: "array",
-                          items: { type: "string" },
-                          description: "Topics or approaches to avoid"
-                        },
-                        engagement: {
-                          type: "array",
-                          items: { type: "string" },
-                          description: "Engagement patterns (e.g., asks follow-up questions)"
+                    }
+                  },
+                  preferences: {
+                    type: "object",
+                    description: "Conversation preferences and style",
+                    properties: {
+                      topics: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Preferred conversation topics"
+                      },
+                      avoids: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Topics or approaches to avoid"
+                      },
+                      engagement: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Engagement patterns (e.g., asks follow-up questions)"
+                      },
+                      relationship_dynamics: {
+                        type: "object",
+                        properties: {
+                          power_position: {
+                            type: "string",
+                            description: "How they position themselves in relationships (dominant, submissive, equal)"
+                          },
+                          trust_indicators: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "How they show trust or intimacy"
+                          },
+                          boundary_style: {
+                            type: "string",
+                            description: "How they set or respect boundaries"
+                          }
                         }
+                      },
+                      context_preferences: {
+                        type: "object",
+                        properties: {
+                          formal_contexts: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "How they communicate in formal situations"
+                          },
+                          casual_contexts: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "How they communicate in casual situations"
+                          },
+                          work_contexts: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "How they communicate in work situations"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  communication_patterns: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      message_length: { type: "string", enum: ["short", "medium", "long"] },
+                      punctuation_style: { type: "string", enum: ["standard", "emojis", "abbreviations", "formal", "casual"] },
+                      capitalization: { type: "string", enum: ["proper", "all caps", "mixed", "formal", "casual"] },
+                      abbreviations: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Common abbreviations and expressions used"
+                      },
+                      unique_expressions: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Unique expressions, phrases, or language patterns specific to this person"
                       }
                     }
                   }
                 }
               }
-            ],
-            function_call: { name: "create_style_profile" }
+            }
+          ],
+          function_call: { name: "create_style_profile" },
+          max_tokens: 1500
           });
 
           raw = analysisRes.choices[0]?.message?.function_call?.arguments || "{}";
@@ -436,51 +727,47 @@ ${styleSample.map(m => m.message).join("\n")}`
               topics: ["general conversation"],
               avoids: ["controversial topics"],
               engagement: ["responds thoughtfully"]
+            },
+            communication_patterns: {
+              message_length: "medium",
+              punctuation_style: "standard",
+              capitalization: "proper",
+              abbreviations: [],
+              unique_expressions: []
             }
           });
         }
       
       let styleProfile: StyleProfile;
       try {
+        // Clean and validate the JSON response
+        let cleanedRaw = raw.trim();
+        
+        // Check if JSON is complete (has matching braces)
+        let braceCount = 0;
+        for (let i = 0; i < cleanedRaw.length; i++) {
+          if (cleanedRaw[i] === '{') braceCount++;
+          if (cleanedRaw[i] === '}') braceCount--;
+        }
+        
+        // If braces don't match, try to fix truncated JSON
+        if (braceCount > 0) {
+          // Add missing closing braces
+          for (let i = 0; i < braceCount; i++) {
+            cleanedRaw += '}';
+          }
+        }
+        
         // Validate that the response starts with { and ends with }
-        if (!raw.startsWith("{") || !raw.endsWith("}")) {
+        if (!cleanedRaw.startsWith("{") || !cleanedRaw.endsWith("}")) {
           throw new Error("Response is not a JSON object");
         }
         
-        styleProfile = JSON.parse(raw) as StyleProfile;
+        styleProfile = JSON.parse(cleanedRaw) as StyleProfile;
         
-        // Validate required fields and types
-        if (typeof styleProfile.tone !== "string" || !styleProfile.tone) {
-          throw new Error("Missing or invalid tone");
-        }
-        if (styleProfile.formality !== "formal" && styleProfile.formality !== "casual") {
-          throw new Error("Invalid formality value");
-        }
-        if (typeof styleProfile.pacing !== "string" || !styleProfile.pacing) {
-          throw new Error("Missing or invalid pacing");
-        }
-        if (!Array.isArray(styleProfile.vocabulary)) {
-          throw new Error("vocabulary must be an array");
-        }
-        if (!Array.isArray(styleProfile.quirks)) {
-          throw new Error("quirks must be an array");
-        }
-        if (!Array.isArray(styleProfile.examples)) {
-          throw new Error("examples must be an array");
-        }
-
-        // Validate new fields
-        if (!styleProfile.traits || typeof styleProfile.traits !== "object") {
-          throw new Error("traits must be an object");
-        }
-        if (!styleProfile.emotions || typeof styleProfile.emotions !== "object") {
-          throw new Error("emotions must be an object");
-        }
-        if (!styleProfile.preferences || typeof styleProfile.preferences !== "object") {
-          throw new Error("preferences must be an object");
-        }
-
-        // Set default values for optional fields
+        console.log(`[upload/route] Successfully parsed style profile for ${participant}`);
+        
+        // Set default values for optional fields FIRST
         styleProfile.traits = {
           openness: 5,
           expressiveness: 5,
@@ -506,6 +793,49 @@ ${styleSample.map(m => m.message).join("\n")}`
           engagement: [],
           ...styleProfile.preferences
         };
+
+        styleProfile.communication_patterns = {
+          message_length: "medium",
+          punctuation_style: "standard",
+          capitalization: "proper",
+          abbreviations: [],
+          unique_expressions: [],
+          ...styleProfile.communication_patterns
+        };
+        
+        // Validate required fields and types AFTER setting defaults
+        if (typeof styleProfile.tone !== "string" || !styleProfile.tone) {
+          throw new Error("Missing or invalid tone");
+        }
+        if (styleProfile.formality !== "formal" && styleProfile.formality !== "casual" && styleProfile.formality !== "mixed") {
+          throw new Error("Invalid formality value");
+        }
+        if (typeof styleProfile.pacing !== "string" || !styleProfile.pacing) {
+          throw new Error("Missing or invalid pacing");
+        }
+        if (!Array.isArray(styleProfile.vocabulary)) {
+          throw new Error("vocabulary must be an array");
+        }
+        if (!Array.isArray(styleProfile.quirks)) {
+          throw new Error("quirks must be an array");
+        }
+        if (!Array.isArray(styleProfile.examples)) {
+          throw new Error("examples must be an array");
+        }
+
+        // Validate new fields (should all exist now due to defaults)
+        if (!styleProfile.traits || typeof styleProfile.traits !== "object") {
+          throw new Error("traits must be an object");
+        }
+        if (!styleProfile.emotions || typeof styleProfile.emotions !== "object") {
+          throw new Error("emotions must be an object");
+        }
+        if (!styleProfile.preferences || typeof styleProfile.preferences !== "object") {
+          throw new Error("preferences must be an object");
+        }
+        if (!styleProfile.communication_patterns || typeof styleProfile.communication_patterns !== "object") {
+          throw new Error("communication_patterns must be an object");
+        }
       } catch (error) {
         console.warn(`Failed to parse style profile for ${participant}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         console.warn('Raw response:', raw);
@@ -534,6 +864,13 @@ ${styleSample.map(m => m.message).join("\n")}`
             topics: ["general conversation"],
             avoids: ["controversial topics"],
             engagement: ["responds thoughtfully"]
+          },
+          communication_patterns: {
+            message_length: "medium",
+            punctuation_style: "standard",
+            capitalization: "proper",
+            abbreviations: [],
+            unique_expressions: []
           }
         };
       }
@@ -551,20 +888,47 @@ ${styleSample.map(m => m.message).join("\n")}`
       personas.push(persona);
     }
 
-    // Update IP usage counter
-    ipUsage.set(ip, used + personas.length);
+    // Update server-side persona storage
+    const updatedPersonas = [...existingPersonas, ...personas];
+    ipPersonas.set(ip, updatedPersonas);
+    
+    // Keep the old counter for backward compatibility
+    ipUsage.set(ip, updatedPersonas.length);
     
     // Generate session ID for this upload
     const sessionId = Date.now().toString();
     
+    // Check if we had to skip some participants due to limit
+    const skippedCount = selectedParticipants.length - personas.length;
+    const limitInfo = skippedCount > 0 ? {
+      message: `Processed ${personas.length} out of ${selectedParticipants.length} participants due to persona limit`,
+      skippedCount,
+      totalParticipants: selectedParticipants.length
+    } : null;
+    
     return NextResponse.json({
       sessionId,
       personas,
-      autoSelectionInfo: null // No auto-selection needed for conversation format
+      autoSelectionInfo: null, // No auto-selection needed for conversation format
+      totalPersonasCreated: used + personas.length, // Return the updated total
+      limitInfo
     });
 
   } catch (error) {
     console.error('[upload/route] Error:', error);
+    
+    // Check if it's a quota exceeded error
+    if (error instanceof Error && error.message.includes('quota_exceeded')) {
+      return NextResponse.json(
+        { 
+          error: 'Service temporarily unavailable due to usage limits. Please try again later.',
+          errorType: 'quota_exceeded',
+          redirectTo: '/out-of-credits'
+        },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal Server Error' },
       { status: 500 }

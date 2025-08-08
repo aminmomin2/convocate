@@ -230,6 +230,11 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if it's a quota exceeded error and redirect
+        if (data.errorType === 'quota_exceeded' && data.redirectTo) {
+          window.location.href = data.redirectTo;
+          return;
+        }
         throw new Error(data.error || `Chat API error: ${response.status}`);
       }
 

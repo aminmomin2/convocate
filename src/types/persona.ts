@@ -38,6 +38,15 @@ export interface StyleProfile {
     avoids?: string[];     // topics or approaches to avoid
     engagement?: string[]; // e.g. ["asks follow-up questions", "shares relevant experiences"]
   };
+  
+  // Communication patterns
+  communication_patterns?: {
+    message_length?: string;      // e.g. "short", "medium", "long"
+    punctuation_style?: string;   // e.g. "standard", "emojis", "abbreviations", "formal", "casual"
+    capitalization?: string;      // e.g. "proper", "all caps", "mixed", "formal", "casual"
+    abbreviations?: string[];     // e.g. ["lol", "omg", "btw"]
+    unique_expressions?: string[]; // e.g. ["bro", "dude", "chill", "deadass"] or formal expressions
+  };
 }
 
 export interface StoredMessage {

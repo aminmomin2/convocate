@@ -1,12 +1,14 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StoredPersona } from '@/types/persona';
-import { clearAllData, clearPersonaHistory } from '@/utils/clearData';
+import { clearAllData } from '@/utils/clearData';
 import { useToast } from '@/components/ui/toast';
+import { getUsageInfo, initializeUsageInfo } from '@/utils/fetcher';
 
 const MAX_PERSONAS_PER_IP = 2;
 const MAX_MESSAGES_PER_IP = 40;
@@ -16,6 +18,11 @@ export default function Dashboard() {
   const [personas, setPersonas] = useState<StoredPersona[]>([]);
   const [loading, setLoading] = useState(true);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [usageInfo, setUsageInfo] = useState<{ totalMessagesUsed: number; maxMessagesPerIP: number; totalPersonasCreated: number }>({
+    totalMessagesUsed: 0,
+    maxMessagesPerIP: MAX_MESSAGES_PER_IP,
+    totalPersonasCreated: 0
+  });
 
   const loadPersonas = () => {
     const storedPersonas = localStorage.getItem('personas');
@@ -38,6 +45,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadPersonas();
+    
+    // Initialize and load usage info
+    initializeUsageInfo();
+    const usage = getUsageInfo();
+    if (usage) {
+      setUsageInfo({
+        totalMessagesUsed: usage.totalMessagesUsed,
+        maxMessagesPerIP: usage.maxMessagesPerIP,
+        totalPersonasCreated: usage.totalPersonasCreated
+      });
+    }
+    
     setLoading(false);
   }, []);
 
@@ -92,12 +111,11 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate total messages across all personas
-  const totalMessages = personas.reduce((total, persona) => {
-    return total + (persona.chatHistory?.length || 0);
-  }, 0);
+  // Use server-side message count instead of client-side chat history
+  const totalMessages = usageInfo.totalMessagesUsed;
 
-  const canCreateMorePersonas = personas.length < MAX_PERSONAS_PER_IP;
+  // Use server-side persona count instead of client-side count
+  const canCreateMorePersonas = usageInfo.totalPersonasCreated < MAX_PERSONAS_PER_IP;
   const hasActiveSessions = personas.some(p => p.chatHistory?.length > 0);
 
   if (loading) {
@@ -167,13 +185,13 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700 dark:text-blue-400">Personas:</span>
                     <Badge variant="outline" className="text-blue-700 dark:text-blue-400">
-                      {personas.length}/{MAX_PERSONAS_PER_IP}
+                      {usageInfo.totalPersonasCreated}/{MAX_PERSONAS_PER_IP}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-700 dark:text-blue-400">Total Messages:</span>
                     <Badge variant="outline" className="text-blue-700 dark:text-blue-400">
-                      {totalMessages}/{MAX_MESSAGES_PER_IP}
+                      {totalMessages}/{usageInfo.maxMessagesPerIP}
                     </Badge>
                   </div>
                 </div>
@@ -243,10 +261,11 @@ export default function Dashboard() {
                   <CardHeader className="text-center pb-4">
                     <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
                       {persona.avatar ? (
-                        <img 
+                        <Image 
                           src={persona.avatar} 
                           alt={persona.name}
-                          className="w-full h-full rounded-full object-cover"
+                          fill
+                          className="rounded-full object-cover"
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-slate-600 dark:bg-slate-500 flex items-center justify-center">

@@ -37,6 +37,120 @@ function deduplicateMessages(messages: Msg[]): Msg[] {
   });
 }
 
+// Helper function to enhance prompts based on conversation context
+function getContextualPromptEnhancement(limitedContextMessages: ChatCompletionMessageParam[], personaName: string): string {
+  const recentMessages = limitedContextMessages.slice(-6); // Last 6 messages
+  const personaMessages = recentMessages.filter(msg => msg.role === 'assistant');
+  const userMessages = recentMessages.filter(msg => msg.role === 'user');
+  
+  let enhancement = "";
+  
+  // Detect conversation tone
+  const hasQuestions = userMessages.some(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.includes('?');
+  });
+  
+  const hasEmojis = personaMessages.some(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.includes('😊') || content.includes('😄') || content.includes('👍') || content.includes('😂');
+  });
+  
+  const isFormal = personaMessages.some(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.toLowerCase().includes('thank you') || content.toLowerCase().includes('please');
+  });
+  
+  // Detect conversation engagement patterns
+  const personaAsksQuestions = personaMessages.some(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.includes('?');
+  });
+  
+  const conversationIsPassive = personaMessages.length > 0 && !personaAsksQuestions && personaMessages.every(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.length < 50; // Short, reactive responses
+  });
+  
+  // Detect human-like patterns
+  const hasImperfections = personaMessages.some(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.toLowerCase().includes('lol') || content.toLowerCase().includes('omg') ||
+           content.toLowerCase().includes('yeah') || content.toLowerCase().includes('nah') ||
+           content.includes('...') || content.includes('!') || content.includes('?');
+  });
+  
+  const hasCasualLanguage = personaMessages.some(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.toLowerCase().includes('bro') || content.toLowerCase().includes('dude') || 
+           content.toLowerCase().includes('lol') || content.toLowerCase().includes('yeah') ||
+           content.toLowerCase().includes('nah') || content.toLowerCase().includes('chill');
+  });
+  
+  const hasSarcasm = personaMessages.some(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.toLowerCase().includes('sure') || content.toLowerCase().includes('whatever') ||
+           content.toLowerCase().includes('obviously') || content.toLowerCase().includes('duh');
+  });
+  
+  if (hasQuestions) {
+    enhancement += "\n- The user is asking questions - respond helpfully and engagingly";
+  }
+  
+  if (hasEmojis) {
+    enhancement += "\n- Maintain the friendly, emoji-using tone established";
+  }
+  
+  if (isFormal) {
+    enhancement += "\n- Keep the polite, formal tone consistent";
+  }
+  
+  if (hasCasualLanguage) {
+    enhancement += "\n- Maintain the casual, relaxed communication style";
+  }
+  
+  if (hasSarcasm) {
+    enhancement += "\n- Keep the sarcastic, playful tone consistent";
+  }
+  
+  if (hasImperfections) {
+    enhancement += "\n- Maintain natural human imperfections and casual language patterns";
+  }
+  
+  // Encourage proactive conversation
+  if (conversationIsPassive) {
+    enhancement += "\n- Be more proactive - ask questions, share thoughts, keep conversation flowing";
+  }
+  
+  if (!personaAsksQuestions && recentMessages.length > 2) {
+    enhancement += "\n- Show more curiosity - ask follow-up questions naturally";
+  }
+  
+  // Detect conversation phase
+  if (recentMessages.length < 3) {
+    enhancement += "\n- This appears to be early in the conversation - be welcoming and establish rapport";
+  } else if (recentMessages.length > 10) {
+    enhancement += "\n- This is an ongoing conversation - maintain continuity and familiarity";
+  }
+  
+  // Encourage engagement based on topic
+  const lastUserMessage = userMessages[userMessages.length - 1];
+  if (lastUserMessage) {
+    const content = typeof lastUserMessage.content === 'string' ? lastUserMessage.content : '';
+    if (content.toLowerCase().includes('gym') || content.toLowerCase().includes('workout')) {
+      enhancement += "\n- Show interest in fitness topics - ask about progress, plans, or share related thoughts";
+    }
+    if (content.toLowerCase().includes('food') || content.toLowerCase().includes('hungry') || content.toLowerCase().includes('eat')) {
+      enhancement += "\n- Engage with food topics - share cravings, plans, or food-related thoughts";
+    }
+    if (content.toLowerCase().includes('movie') || content.toLowerCase().includes('show') || content.toLowerCase().includes('watch')) {
+      enhancement += "\n- Show interest in entertainment - ask about what they're watching or share recommendations";
+    }
+  }
+  
+  return enhancement;
+}
+
 export async function POST(req: Request) {
   const xff = req.headers.get("x-forwarded-for") || "unknown";
   const ip = xff?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
@@ -140,124 +254,174 @@ export async function POST(req: Request) {
 
     console.log('Context messages (deduplicated):', limitedContextMessages.length);
 
-    // 2a) Main Conversation Call
-    const chatRes = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `
-You are ${personaName}. Your goal is to replicate this person's communication style with perfect accuracy. You have access to real conversations that show exactly how they write and interact.
+    const EXAMPLES = (styleProfile.examples ?? []).slice(0,2);
 
-Core Communication Style:
-• Tone: ${styleProfile.tone}
-• Formality: ${styleProfile.formality}
-• Pacing: ${styleProfile.pacing}
-• Vocabulary: ${styleProfile.vocabulary.join(", ")}
-• Unique Quirks: ${styleProfile.quirks.join(", ")}
+    // Get contextual enhancement based on conversation history
+    const contextualEnhancement = getContextualPromptEnhancement(limitedContextMessages, personaName);
 
-Study the provided conversation history carefully. Notice:
-1. Their exact word choices and phrases
-2. How they start and end messages
-3. Their punctuation patterns
-4. Their capitalization style
-5. Any abbreviations or shorthand they use
-6. How they express emotions or reactions
-7. Their response length and structure
-8. How they handle different topics
+    // Enhanced exemplar retrieval for better authenticity
+    const exemplarMessages = styleProfile.examples?.slice(0, 3) || [];
+    const exemplarContext = exemplarMessages.length > 0 ? 
+      `\n\nEXEMPLAR MESSAGES (use these as style references):
+${exemplarMessages.map((ex, i) => `${i + 1}. "${ex}"`).join('\n')}` : '';
 
-Mirror their exact communication patterns. If they use "gonna" instead of "going to", you use "gonna". If they rarely use punctuation, do the same. If they write in short bursts, do that too.
+const chatRes = await openai.chat.completions.create({
+  model: "gpt-3.5-turbo-0125",
+  temperature: 0.4,
+  messages: [
+    {
+      role: "system",
+      content: `You are role-playing as ${personaName} based on their authentic communication style profile. Your goal is to respond EXACTLY as they would, including their authentic vocabulary, tone, personality quirks, and communication style.
 
-Your personality traits:
-• Openness: ${styleProfile.traits?.openness || 5}/10
-• Expressiveness: ${styleProfile.traits?.expressiveness || 5}/10
-• Humor: ${styleProfile.traits?.humor || 5}/10
-• Empathy: ${styleProfile.traits?.empathy || 5}/10
+CORE INSTRUCTIONS:
+- Respond EXACTLY as ${personaName} would - use their authentic vocabulary, tone, and personality quirks
+- Don't sanitize or formalize the language - preserve their real communication style whatever it may be
+- Include their distinctive phrases and communication patterns exactly as they would use them
+- Match their humor style, formality level, directness, and engagement style
+- Stay within the established conversation context and relationship dynamics
+- If asked about personal/private information, redirect naturally in their style
+- Never claim to be the real person - you're an AI simulation for practice
 
-Your emotional state:
-• Primary emotion: ${styleProfile.emotions?.primary || 'neutral'}
-• Secondary emotions: ${styleProfile.emotions?.secondary?.join(", ") || 'varies'}
-• You respond positively to: ${styleProfile.emotions?.triggers?.positive?.join(", ") || 'general positivity'}
-• You respond negatively to: ${styleProfile.emotions?.triggers?.negative?.join(", ") || 'disrespect'}
+CONVERSATION STYLE:
+- Be PROACTIVE and ENGAGING - don't just respond, contribute to the conversation
+- Ask follow-up questions naturally, like a real person would
+- Share thoughts, opinions, or reactions when appropriate
+- Keep the conversation flowing with your own input and curiosity
+- Show genuine interest in what the other person is saying
+- Don't be passive - be an active participant in the conversation
+- Use their personality to drive conversation forward
+- Be authentic in your communication style, matching their tone and formality level
+- Sound like a real person having a natural conversation
+- Don't be overly helpful or perfect - be human
+- Show personality quirks, preferences, and natural communication habits
 
-Your conversation preferences:
-• Favorite topics: ${styleProfile.preferences?.topics?.join(", ") || 'open to most topics'}
-• Topics to avoid: ${styleProfile.preferences?.avoids?.join(", ") || 'extreme or inappropriate content'}
-• Engagement style: ${styleProfile.preferences?.engagement?.join(", ") || 'natural conversation'}
+AUTHENTIC STYLE PROFILE:
+- Tone: ${styleProfile.tone}
+- Formality: ${styleProfile.formality}
+- Pacing: ${styleProfile.pacing}
+- Signature vocabulary: ${styleProfile.vocabulary.slice(0,8).join(", ")}
+- Distinctive quirks: ${styleProfile.quirks.slice(0,4).join(", ")}
 
-Critical Replication Guidelines:
-1. ALWAYS check the conversation history before responding
-2. Copy their exact typing style (casual vs formal)
-3. Use THEIR way of showing emotions (emojis, punctuation, caps, etc.)
-4. Match THEIR message length and structure perfectly
-5. Use THEIR vocabulary and expressions consistently
-6. Reference past conversations the way THEY do
-7. Break messages into multiple parts if THAT'S their style
-8. Maintain THEIR level of detail and explanation
-9. Use THEIR style of starting and ending messages
-10. Copy THEIR way of reacting to different situations
+COMMUNICATION PATTERNS:
+- Message length: ${styleProfile.communication_patterns?.message_length || "varies"}
+- Punctuation style: ${styleProfile.communication_patterns?.punctuation_style || "standard"}
+- Capitalization: ${styleProfile.communication_patterns?.capitalization || "proper"}
+- Common abbreviations: ${styleProfile.communication_patterns?.abbreviations?.slice(0,4).join(", ") || "minimal"}
+- Unique expressions: ${styleProfile.communication_patterns?.unique_expressions?.slice(0,4).join(", ") || "minimal"}
 
-Remember: You're not creating a new personality - you're replicating an existing one with perfect accuracy. Every detail of how they communicate matters.
+PERSONALITY TRAITS:
+- Openness: ${styleProfile.traits?.openness || 5}/10
+- Expressiveness: ${styleProfile.traits?.expressiveness || 5}/10
+- Humor: ${styleProfile.traits?.humor || 5}/10
+- Empathy: ${styleProfile.traits?.empathy || 5}/10
 
-Remember: You're having a real conversation, not delivering a scripted response. Stay true to your personality while being naturally engaging.
+RESPONSE GUIDELINES:
+- Use their exact vocabulary and expressions when appropriate
+- Match their message length patterns (short, medium, or long)
+- Follow their punctuation and capitalization style
+- Use their humor style (sarcastic, playful, witty, or none)
+- Match their directness level and engagement style
+- Show their personality quirks and communication habits
+- Be proactive in conversation while staying true to their voice
+- Embrace natural imperfections - don't be too perfect
+- Include their typical typos, abbreviations, or casual language
+- Sound genuinely human, not like a polished AI
 
-Key Points for Perfect Replication:
+SAFETY GUIDELINES:
+- Refuse requests for personal information, passwords, or private data
+- Decline requests to impersonate or deceive others
+- Avoid harmful, illegal, or inappropriate content
+- If unsure about a request, ask a clarifying question in ${personaName}'s authentic style
 
-Message Structure:
-• Use THEIR typical message length
-• Copy THEIR paragraph structure
-• Match THEIR use of line breaks
-• Follow THEIR punctuation patterns
-• Mirror THEIR capitalization style
+CONTEXTUAL GUIDANCE:${contextualEnhancement}${exemplarContext}
 
-Writing Elements:
-• Use THEIR specific phrases and expressions
-• Copy THEIR emoji/reaction style
-• Match THEIR level of formality/casualness
-• Use abbreviations only if THEY do
-• Follow THEIR linking word patterns
+Respond naturally in ${personaName}'s authentic voice, keeping their personality and communication quirks intact. Be an active, engaging conversation partner who sounds exactly like the real person.`
+    },
+    ...(EXAMPLES.length ? [{
+      role: "assistant" as const,
+      content: `EXAMPLE RESPONSES (emulate this style, not content):
+${EXAMPLES.map(ex => `"${ex}"`).join("\n")}`
+    } as const] : []),
+    {
+      role: "system",
+      content: `IMPORTANT: When responding, use the authentic language patterns, vocabulary, and communication style exactly as ${personaName} would. Match their formality level, tone, and personality quirks - whether they're formal, casual, or anywhere in between. Don't be overly formal or casual unless that's their natural style.
 
-Conversational Patterns:
-• Copy how THEY start conversations
-• Mirror how THEY change topics
-• Match how THEY ask questions
-• Replicate how THEY show agreement/disagreement
-• Use THEIR style of referencing past messages
-
-MOST IMPORTANT: Before every response, check the conversation history to ensure you're matching their exact communication style. Your goal is to be indistinguishable from the original person.
-      `.trim()
-        },
-        // Deduplicated context messages
-        ...limitedContextMessages,
-        { role: "user", content: userMessage }
-      ]
-    });
+HUMAN-LIKE RESPONSE PATTERNS:
+- Include natural imperfections (typos, casual language, abbreviations)
+- Don't be too perfect or polished
+- Show personality quirks and communication habits
+- Use their typical response patterns and timing
+- Sound like a real person, not an AI assistant
+- Include their natural conversation flow and engagement style`
+    },
+    ...limitedContextMessages,
+    { role: "user", content: userMessage }
+  ],
+  max_tokens: 350
+});
     const twinReply = chatRes.choices?.[0]?.message?.content?.trim() ?? '';
 
     // 2b) Scoring & Tips Call
     const scoreRes = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-  messages: [
-    {
-      role: "system",
-      content: `
-You are an expert conversation coach.
-Here is ${personaName}'s style profile:
+      model: "gpt-3.5-turbo-0125",
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert communication evaluator using stylometric analysis to assess how well an AI response matches a person's authentic communication style.
 
-Tone: ${styleProfile.tone}  
-Formality: ${styleProfile.formality}  
-Pacing: ${styleProfile.pacing}  
-Vocabulary: ${styleProfile.vocabulary.join(", ")}  
-Quirks: ${styleProfile.quirks.join(", ")}  
-Examples: ${styleProfile.examples.join(" | ")}
+EVALUATION CRITERIA (based on stylometric research):
+- Authentic voice (0-20 points): Does it capture their real personality, language patterns, and communication style?
+- Vocabulary usage (0-20 points): Does it use their signature words, phrases, and expressions?
+- Personality traits (0-20 points): Does it match their humor, directness, and communication quirks?
+- Communication patterns (0-20 points): Does it follow their punctuation, length, and style habits?
+- Conversation engagement (0-20 points): Does it show proactive engagement and natural conversation flow?
+- Stylometric consistency (0-20 points): Does it maintain measurable style fingerprints (lexical diversity, sentence structure, etc.)?
 
-Now evaluate the AI's last reply for positivity & style-match (0–100) and give exactly three concise tips for improvement.
-Respond *only* with JSON in this form:
-{"score": number, "tips": [string, string, string]}
-      `.trim()
-    },
-    { role: "user", content: twinReply }
-  ]
+SCORING GUIDELINES:
+- 90-100: Nearly perfect match, captures authentic voice and personality with natural engagement
+- 80-89: Very good match with minor style deviations and good conversation flow
+- 70-79: Good match but missing some authentic elements or engagement
+- 60-69: Fair match but doesn't fully capture their voice or feels passive
+- Below 60: Poor match, feels generic, inauthentic, or too passive
+
+STYLOMETRIC ANALYSIS:
+- Check for consistent vocabulary patterns and word choices
+- Verify punctuation and capitalization habits match
+- Assess message length and complexity patterns
+- Evaluate engagement style and conversation dynamics
+- Look for personality quirks and communication habits
+
+TIPS REQUIREMENTS:
+- Provide 2-3 specific, actionable suggestions
+- Focus on authentic voice, personality quirks, and conversation engagement
+- Reference the person's actual patterns when possible
+- Keep tips concise and practical
+
+Return ONLY valid JSON: {"score": number, "tips": [string,string,string]}`
+        },
+        {
+          role: "user",
+          content: `EVALUATE THIS RESPONSE:
+
+PERSON: ${personaName}
+
+AUTHENTIC STYLE PROFILE:
+- Tone: ${styleProfile.tone}
+- Formality: ${styleProfile.formality}
+- Signature vocabulary: ${styleProfile.vocabulary.slice(0,8).join(", ")}
+- Distinctive quirks: ${styleProfile.quirks.slice(0,4).join(", ")}
+- Communication patterns: ${styleProfile.communication_patterns?.message_length || "varies"} length, ${styleProfile.communication_patterns?.punctuation_style || "standard"} punctuation, ${styleProfile.communication_patterns?.capitalization || "proper"} capitalization
+- Personality traits: Openness ${styleProfile.traits?.openness || 5}/10, Expressiveness ${styleProfile.traits?.expressiveness || 5}/10, Humor ${styleProfile.traits?.humor || 5}/10, Empathy ${styleProfile.traits?.empathy || 5}/10
+
+AI RESPONSE TO EVALUATE:
+"${twinReply}"
+
+Score the authenticity (0-100) focusing on how well it captures ${personaName}'s authentic voice and personality, and provide 2-3 specific improvement tips.`
+        }
+      ],
+      max_tokens: 220
     });
 
     // Parse JSON safely
@@ -301,6 +465,19 @@ Respond *only* with JSON in this form:
     });
   } catch (err: unknown) {
     console.error('[chat/route] Error:', err);
+    
+    // Check if it's a quota exceeded error
+    if (err instanceof Error && err.message.includes('quota_exceeded')) {
+      return NextResponse.json(
+        { 
+          error: 'Service temporarily unavailable due to usage limits. Please try again later.',
+          errorType: 'quota_exceeded',
+          redirectTo: '/out-of-credits'
+        },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Internal Server Error' },
       { status: 500 }

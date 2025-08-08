@@ -61,6 +61,22 @@ export const updateTotalPersonasCreated = (newCount: number) => {
   }
 };
 
+// Update usage info from upload response
+export const updateUsageFromUpload = (totalPersonasCreated: number) => {
+  try {
+    const currentUsage = getUsageInfo();
+    const updatedUsage: UsageInfo = {
+      totalMessagesUsed: currentUsage?.totalMessagesUsed || 0,
+      maxMessagesPerIP: 40,
+      totalPersonasCreated: totalPersonasCreated,
+      maxPersonasPerIP: 2
+    };
+    saveUsageInfo(updatedUsage);
+  } catch (error) {
+    console.error('Failed to update usage from upload:', error);
+  }
+};
+
 // Initialize usage info if it doesn't exist
 export const initializeUsageInfo = () => {
   try {

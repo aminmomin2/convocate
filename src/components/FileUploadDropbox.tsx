@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import PersonaNaming from './PersonaNaming';
 
 import { Msg, StoredPersona } from '@/types/persona';
-import { getUsageInfo, updateTotalPersonasCreated } from '@/utils/fetcher';
+import { getUsageInfo, updateTotalPersonasCreated, updateUsageFromUpload } from '@/utils/fetcher';
 
 const MAX_FILE_SIZE_MB = 10;
 
@@ -23,30 +23,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
   const [sessionId, setSessionId] = useState<string>('');
   const [error, setError] = useState<string>('');
 
-  // Check if user has already created 2 personas (permanent limit)
-  const checkPersonaLimit = useCallback(() => {
-    try {
-      // Get total personas ever created from centralized usage info
-      const usageInfo = getUsageInfo();
-      const currentCount = usageInfo?.totalPersonasCreated || 0;
-      
-      // Count how many new personas this upload would create
-      const newPersonasFromUpload = uploadedPersonas.length;
-      
-      // Check if this would exceed the permanent limit
-      if (currentCount + newPersonasFromUpload > 2) {
-        return {
-          canCreate: false,
-          reason: `You have already created ${currentCount} personas. You can only create 2 personas total (yourself + one other person). This limit cannot be reset by deleting personas.`
-        };
-      }
-      
-      return { canCreate: true };
-    } catch (error) {
-      console.error('Error checking persona limit:', error);
-      return { canCreate: true }; // Allow if there's an error
-    }
-  }, [uploadedPersonas.length]);
+
 
   const supportedTypes = [
     { ext: '.csv', desc: 'CSV with sender, message, timestamp columns' },
@@ -122,13 +99,6 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
-    // Check persona limit before uploading
-    const limitCheck = checkPersonaLimit();
-    if (!limitCheck.canCreate) {
-      setError(limitCheck.reason || 'Cannot create more personas');
-      return;
-    }
-
     setIsUploading(true);
     setError('');
     
@@ -146,12 +116,22 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if it's a quota exceeded error and redirect
+        if (data.errorType === 'quota_exceeded' && data.redirectTo) {
+          window.location.href = data.redirectTo;
+          return;
+        }
         throw new Error(data.error || 'Upload failed');
       }
       
       // Store the uploaded data and transition to naming step
       setSessionId(data.sessionId || Date.now().toString());
       setUploadedPersonas(data.personas);
+      
+      // Update usage info with server response
+      if (data.totalPersonasCreated) {
+        updateUsageFromUpload(data.totalPersonasCreated);
+      }
       
       // Show auto-selection info if provided
       if (data.autoSelectionInfo) {
@@ -180,13 +160,6 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
   };
 
   const handlePersonaNamingComplete = (namedPersonas: StoredPersona[]) => {
-    // Check persona limit again before finalizing
-    const limitCheck = checkPersonaLimit();
-    if (!limitCheck.canCreate) {
-      setError(limitCheck.reason || 'Cannot create more personas');
-      return;
-    }
-
     // Store personas with full transcripts and empty chatHistory in localStorage
     const storedPersonas: StoredPersona[] = namedPersonas.map(persona => ({
       id: persona.id,
@@ -203,11 +176,8 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
       }, // Include styleProfile from uploaded data
     }));
     
-    // Update the permanent counter of personas ever created using centralized storage
-    const usageInfo = getUsageInfo();
-    const currentCount = usageInfo?.totalPersonasCreated || 0;
-    const newTotal = currentCount + namedPersonas.length;
-    updateTotalPersonasCreated(newTotal);
+    // Note: Server-side persona count is already updated in handleUpload
+    // No need to update again here as the server tracks the permanent count
     
     localStorage.setItem('personas', JSON.stringify(storedPersonas));
     
@@ -228,17 +198,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
     setError('');
   };
 
-  // Check persona limit on component mount and when uploadedPersonas changes
-  React.useEffect(() => {
-    if (uploadedPersonas.length > 0) {
-      const limitCheck = checkPersonaLimit();
-      if (!limitCheck.canCreate) {
-        setError(limitCheck.reason || 'Cannot create more personas');
-        setCurrentStep('upload');
-        setUploadedPersonas([]);
-      }
-    }
-  }, [uploadedPersonas, checkPersonaLimit]);
+
 
   // Render persona naming step if upload is complete
   if (currentStep === 'naming') {
