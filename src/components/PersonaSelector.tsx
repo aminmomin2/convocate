@@ -62,14 +62,14 @@ export default function PersonaSelector({
         <CardHeader className={`${isMobile ? 'pb-2' : ''}`}>
           <div className="flex items-center gap-3">
             {/* Avatar */}
-            <div className={`${isMobile ? 'w-12 h-12' : 'w-16 h-16'} rounded-full bg-primary/10 flex items-center justify-center`}>
-              <span className="text-primary font-semibold text-lg">
+            <div className={`${isMobile ? 'w-10 h-10' : 'w-16 h-16'} rounded-full bg-primary/10 flex items-center justify-center`}>
+              <span className={`text-primary font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>
                 {name.charAt(0)}
               </span>
             </div>
             
-            <div className="flex-1">
-              <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'}`}>
+            <div className="flex-1 min-w-0">
+              <CardTitle className={`${isMobile ? 'text-base' : 'text-xl'} truncate`}>
                 {name}
               </CardTitle>
               {!isMobile && (

@@ -203,7 +203,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
           message: msg.content,
           timestamp: msg.timestamp.toISOString(),
         }));
-      console.log(chatHistory);
+
 
       // Call the chat API
       const response = await fetch('/api/chat', {
@@ -216,6 +216,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
           transcript: currentPersona.transcript || [],
           chatHistory: chatHistory,
           userMessage: userMessage,
+          previousScore: currentScore,
           styleProfile: currentPersona.styleProfile || {
             tone: "Neutral and professional",
             formality: "casual",
@@ -378,20 +379,20 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
           <div className="mb-6">
             <div className="bg-muted/50 rounded-lg p-4 mb-4">
               <h3 className="font-semibold text-sm mb-2">🎯 Practice with your digital twin</h3>
-              <p className="text-sm text-muted-foreground mb-3">
+              <p className="text-sm text-muted-foreground mb-3 break-words">
                 Start a conversation with your AI digital twin. It responds exactly like the person you&apos;ve trained it on using real chat/email data. 
                 Perfect for rehearsing sales pitches, practicing difficult conversations, or just chatting with an AI clone of anyone you know.
                 Click any phrase below to begin, or type your own message.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-1 gap-2 lg:flex lg:flex-wrap lg:gap-2">
               {samplePrompts.map((prompt, index) => (
                 <Button
                   key={index}
                   variant="outline"
                   size="sm"
                   onClick={() => handleSamplePromptClick(prompt)}
-                  className="text-xs h-auto py-2 px-3 whitespace-normal text-left"
+                  className="text-xs h-auto py-2 px-3 whitespace-normal text-left lg:inline-block"
                 >
                   {prompt}
                 </Button>
@@ -426,7 +427,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
                   })}
                 </span>
               </div>
-              <p className="text-sm leading-relaxed">{message.content}</p>
+              <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
             </div>
           </div>
         ))}
@@ -441,7 +442,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
             onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             placeholder="Type your response..."
-            className="flex-1 min-h-[40px] max-h-[120px] px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none overflow-y-auto scrollbar-hide"
+            className="flex-1 min-h-[40px] max-h-[120px] px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none overflow-y-auto scrollbar-hide break-words"
             rows={1}
             maxLength={MAX_MESSAGE_LENGTH}
             style={{

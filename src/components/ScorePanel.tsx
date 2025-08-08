@@ -1,46 +1,49 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Lightbulb, Target, Trash2, Info } from 'lucide-react';
-import { getUsageInfo } from '@/utils/fetcher';
+import { Lightbulb, Target, Trash2 } from 'lucide-react';
+
 
 interface ScorePanelProps {
   isMobile?: boolean;
   score?: number | null;
+  previousScore?: number | null;
   tips?: string[];
   onClearHistory?: () => void;
   hasTrainingHistory?: boolean;
-  usageInfo?: {
-    totalMessagesUsed: number;
-    maxMessagesPerIP: number;
-  } | null;
 }
 
 export default function ScorePanel({ 
   isMobile = false, 
   score = null, 
+  previousScore = null,
   tips = [], 
   onClearHistory,
-  hasTrainingHistory = false,
-  usageInfo = null
+  hasTrainingHistory = false
 }: ScorePanelProps) {
   // Use provided score or default
   const outcomeScore = score ?? 0;
   const hasTips = tips.length > 0;
   const hasScore = score !== null;
   
-  // Get centralized usage info if not provided
-  const centralizedUsageInfo = usageInfo || getUsageInfo();
+  // Helper function to get score color
+  const getScoreColor = (current: number | null, previous: number | null) => {
+    if (current === null || previous === null) return 'text-primary';
+    if (current > previous) return 'text-green-600';
+    if (current < previous) return 'text-red-600';
+    return 'text-primary';
+  };
+  
+
 
   return (
     <div className={`space-y-4 ${isMobile ? '' : 'h-full flex flex-col'}`}>
       {/* Outcome Score */}
-      <Card className="flex-shrink-0">
-        <CardHeader className={`${isMobile ? 'pb-2' : 'pb-3'}`}>
-          <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
-            <Target className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-primary`} />
-            Outcome Score
+      <Card className={`flex-shrink-0 ${isMobile ? 'shadow-none border-none bg-transparent' : ''}`}>
+        <CardHeader className={`${isMobile ? 'pb-1' : 'pb-3'}`}>
+          <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-base'}`}>
+            <Target className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} text-primary`} />
+            {isMobile ? 'Score' : 'Outcome Score'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -48,31 +51,49 @@ export default function ScorePanel({
             /* Score Circle/Gauge */
             <div className="flex flex-col items-center space-y-3">
               <div className="relative">
-                <div className={`${isMobile ? 'w-20 h-20' : 'w-24 h-24'} rounded-full bg-muted flex items-center justify-center`}>
-                  <div className={`${isMobile ? 'w-16 h-16' : 'w-20 h-20'} rounded-full bg-primary/10 flex items-center justify-center ring-4 ring-primary/20`}>
-                    <span className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-primary`}>
+                <div className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} rounded-full bg-muted flex items-center justify-center`}>
+                  <div className={`${isMobile ? 'w-12 h-12' : 'w-20 h-20'} rounded-full flex items-center justify-center ring-4 ring-primary/20 ${
+                    getScoreColor(score, previousScore) === 'text-green-600' 
+                      ? 'bg-green-100' 
+                      : getScoreColor(score, previousScore) === 'text-red-600'
+                      ? 'bg-red-100'
+                      : 'bg-primary/10'
+                  }`}>
+                    <span className={`${isMobile ? 'text-sm' : 'text-xl'} font-bold ${
+                      getScoreColor(score, previousScore)
+                    }`}>
                       {Math.round(outcomeScore)}%
                     </span>
                   </div>
                 </div>
-                {/* Score trend indicator - only show if score is meaningful */}
-                {outcomeScore > 0 && (
-                  <div className="absolute -top-1 -right-1">
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
-                      <TrendingUp className="w-3 h-3 mr-1" />
-                      {outcomeScore >= 70 ? '+' : ''}
-                    </Badge>
-                  </div>
-                )}
+
               </div>
               
               <div className="text-center">
-                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium`}>
-                  {outcomeScore >= 80 ? 'Excellent!' : outcomeScore >= 60 ? 'Good Progress!' : outcomeScore >= 40 ? 'Keep Practicing!' : 'Getting Started'}
+                <p className={`${isMobile ? 'text-xs' : 'text-base'} font-medium`}>
+                  {outcomeScore >= 95 ? 'Exceptional!' : 
+                   outcomeScore >= 90 ? 'Excellent!' : 
+                   outcomeScore >= 85 ? 'Very Good!' : 
+                   outcomeScore >= 80 ? 'Good!' : 
+                   outcomeScore >= 75 ? 'Fairly Good!' : 
+                   outcomeScore >= 70 ? 'Fair!' : 
+                   outcomeScore >= 65 ? 'Below Average' : 
+                   outcomeScore >= 60 ? 'Needs Work' : 
+                   'Getting Started'}
                 </p>
-                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-muted-foreground`}>
-                  {outcomeScore >= 80 ? 'Outstanding performance' : 'Keep practicing to improve'}
-                </p>
+                {!isMobile && (
+                  <p className="text-sm text-muted-foreground">
+                    {outcomeScore >= 95 ? 'Perfect authentic voice match' :
+                     outcomeScore >= 90 ? 'Excellent authentic voice match' :
+                     outcomeScore >= 85 ? 'Very good authentic voice match' :
+                     outcomeScore >= 80 ? 'Good authentic voice match' :
+                     outcomeScore >= 75 ? 'Fairly good authentic voice match' :
+                     outcomeScore >= 70 ? 'Fair authentic voice match' :
+                     outcomeScore >= 65 ? 'Below average authentic voice match' :
+                     outcomeScore >= 60 ? 'Needs improvement in authentic voice' :
+                     'Keep practicing to improve your authentic voice'}
+                  </p>
+                )}
               </div>
             </div>
           ) : (
@@ -100,19 +121,19 @@ export default function ScorePanel({
       </Card>
 
       {/* Tips Section */}
-      <Card className="flex-1 min-h-0">
-        <CardHeader className={`${isMobile ? 'pb-2' : 'pb-3'}`}>
-          <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
-            <Lightbulb className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-yellow-500`} />
-            Tips for Improvement
+      <Card className={`flex-1 min-h-0 ${isMobile ? 'shadow-none border-none bg-transparent' : ''}`}>
+        <CardHeader className={`${isMobile ? 'pb-1' : 'pb-3'}`}>
+          <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-base'}`}>
+            <Lightbulb className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} text-yellow-500`} />
+            {isMobile ? 'Tips' : 'Tips for Improvement'}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {hasTips ? (
-            <ul className="space-y-2">
+            <ul className={`${isMobile ? 'space-y-1' : 'space-y-2'}`}>
               {tips.map((tip, index) => (
                 <li key={index} className="flex items-start gap-2">
-                  <div className={`${isMobile ? 'w-4 h-4 mt-0.5' : 'w-5 h-5 mt-1'} rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0`}>
+                  <div className={`${isMobile ? 'w-3 h-3 mt-0' : 'w-5 h-5 mt-1'} rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0`}>
                     <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-primary`}>
                       {index + 1}
                     </span>
@@ -134,39 +155,13 @@ export default function ScorePanel({
         </CardContent>
       </Card>
 
-      {/* Usage Limits Info */}
-      {centralizedUsageInfo && (
-        <Card className="flex-shrink-0 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
-          <CardHeader className={`${isMobile ? 'pb-2' : 'pb-3'}`}>
-            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'} text-blue-700 dark:text-blue-300`}>
-              <Info className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'}`} />
-              Usage Limits
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-blue-600 dark:text-blue-400">Total Messages:</span>
-              <Badge variant="outline" className="text-blue-700 dark:text-blue-400">
-                {centralizedUsageInfo.totalMessagesUsed}/{centralizedUsageInfo.maxMessagesPerIP}
-              </Badge>
-            </div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-              {centralizedUsageInfo.totalMessagesUsed >= centralizedUsageInfo.maxMessagesPerIP 
-                ? "Message limit reached. No more chatting allowed for this IP."
-                : "Message limit is per IP address and cannot be reset by clearing history."
-              }
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Clear Training History Button */}
       {onClearHistory && (
-        <Card className="flex-shrink-0 border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20">
-          <CardHeader className={`${isMobile ? 'pb-3' : 'pb-4'}`}>
-            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-base' : 'text-lg'} text-red-700 dark:text-red-300`}>
-              <Trash2 className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'}`} />
-              Training History
+        <Card className={`flex-shrink-0 border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 ${isMobile ? 'shadow-none' : ''}`}>
+          <CardHeader className={`${isMobile ? 'pb-2' : 'pb-4'}`}>
+            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-lg'} text-red-700 dark:text-red-300`}>
+              <Trash2 className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'}`} />
+              {isMobile ? 'History' : 'Training History'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

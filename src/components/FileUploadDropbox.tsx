@@ -135,7 +135,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
       
       // Show auto-selection info if provided
       if (data.autoSelectionInfo) {
-        console.log('Auto-selection info:', data.autoSelectionInfo);
+
         // You could show a toast or notification here about the auto-selection
       }
       

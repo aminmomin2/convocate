@@ -76,8 +76,8 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/40" />
         
         {/* Floating Elements */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-20 left-10 w-48 h-48 md:w-72 md:h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-64 h-64 md:w-96 md:h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         
         <div className="relative w-full max-w-6xl mx-auto px-4 py-8">
           <div className="space-y-8">
@@ -100,16 +100,16 @@ export default function Home() {
                 <p className="text-sm text-gray-400 font-medium">Practice sales pitches, difficult conversations, or chat with AI clones of friends, colleagues, or mentors</p>
                 
                 {/* Enhanced Key Benefits */}
-                <div className="flex flex-wrap justify-center gap-3">
-                  <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 shadow-lg hover:bg-white/20 transition-all duration-300">
+                <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                  <div className="flex items-center gap-2 text-xs md:text-sm text-gray-300 bg-white/10 backdrop-blur-sm px-3 py-2 md:py-1.5 rounded-full border border-white/20 shadow-lg hover:bg-white/20 transition-all duration-300">
                     <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
                     <span>Digital twins of anyone</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 shadow-lg hover:bg-white/20 transition-all duration-300">
+                  <div className="flex items-center gap-2 text-xs md:text-sm text-gray-300 bg-white/10 backdrop-blur-sm px-3 py-2 md:py-1.5 rounded-full border border-white/20 shadow-lg hover:bg-white/20 transition-all duration-300">
                     <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
                     <span>Real chat data training</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-300 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20 shadow-lg hover:bg-white/20 transition-all duration-300">
+                  <div className="flex items-center gap-2 text-xs md:text-sm text-gray-300 bg-white/10 backdrop-blur-sm px-3 py-2 md:py-1.5 rounded-full border border-white/20 shadow-lg hover:bg-white/20 transition-all duration-300">
                     <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></div>
                     <span>Private practice arena</span>
                   </div>
@@ -120,9 +120,9 @@ export default function Home() {
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 max-w-lg mx-auto">
                 <div className="text-sm text-gray-300 text-center space-y-1">
                   <div className="font-semibold text-white">📊 How Much Data Do You Need?</div>
-                  <div className="flex justify-center items-center gap-4 flex-wrap">
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 flex-wrap">
                     <span><strong>Minimum:</strong> 50 messages</span>
-                    <span className="text-gray-400">•</span>
+                    <span className="text-gray-400 hidden sm:inline">•</span>
                     <span><strong>Optimal:</strong> 100 messages</span>
                   </div>
                 </div>

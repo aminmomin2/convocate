@@ -377,7 +377,7 @@ export async function POST(request: Request) {
     for (const participant of participants) {
       // Check if adding this participant would exceed the limit - DO THIS BEFORE EXPENSIVE API CALL!
       if (used + personas.length >= MAX_PERSONAS_PER_IP) {
-        console.log(`[upload/route] Skipping API call for ${participant} - would exceed limit (${used + personas.length}/${MAX_PERSONAS_PER_IP})`);
+
         break; // Stop processing more participants
       }
       
@@ -699,7 +699,7 @@ Provide evidence-based analysis with specific examples from the messages. Return
           });
 
           raw = analysisRes.choices[0]?.message?.function_call?.arguments || "{}";
-          console.log(`[upload/route] Raw style profile for ${participant}:`, raw);
+  
         } catch (error) {
           console.warn(`Failed to generate style profile for ${participant}:`, error);
           raw = JSON.stringify({
@@ -765,7 +765,7 @@ Provide evidence-based analysis with specific examples from the messages. Return
         
         styleProfile = JSON.parse(cleanedRaw) as StyleProfile;
         
-        console.log(`[upload/route] Successfully parsed style profile for ${participant}`);
+
         
         // Set default values for optional fields FIRST
         styleProfile.traits = {

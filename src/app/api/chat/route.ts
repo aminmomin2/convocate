@@ -10,6 +10,7 @@ interface ChatRequestBody {
   chatHistory: Msg[];
   userMessage: string;
   styleProfile: StyleProfile;
+  previousScore?: number | null;
 }
 
 const MAX_MESSAGES_PER_IP = 40; // 40 total messages per IP
@@ -164,7 +165,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { personaName, transcript, chatHistory, userMessage, styleProfile } =
+    const { personaName, transcript, chatHistory, userMessage, styleProfile, previousScore } =
       (await req.json()) as ChatRequestBody;
 
     // Validate request
@@ -214,13 +215,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Log context distribution for debugging
-    console.log('Context distribution:', {
-      totalContext: transcriptSlice + chatHistorySlice,
-      transcriptUsed: transcriptSlice,
-      chatHistoryUsed: chatHistorySlice,
-      hasChatHistory: deduplicatedChatHistory.length > 0
-    });
+
     
     const transcriptMessages = deduplicatedTranscript
       .slice(-transcriptSlice)
@@ -252,7 +247,7 @@ export async function POST(req: Request) {
     // Limit total context messages to prevent token overflow
     const limitedContextMessages = finalContextMessages.slice(-MAX_CONTEXT_MESSAGES);
 
-    console.log('Context messages (deduplicated):', limitedContextMessages.length);
+
 
     const EXAMPLES = (styleProfile.examples ?? []).slice(0,2);
 
@@ -379,12 +374,16 @@ EVALUATION CRITERIA (based on stylometric research):
 - Conversation engagement (0-20 points): Does it show proactive engagement and natural conversation flow?
 - Stylometric consistency (0-20 points): Does it maintain measurable style fingerprints (lexical diversity, sentence structure, etc.)?
 
-SCORING GUIDELINES:
-- 90-100: Nearly perfect match, captures authentic voice and personality with natural engagement
-- 80-89: Very good match with minor style deviations and good conversation flow
-- 70-79: Good match but missing some authentic elements or engagement
-- 60-69: Fair match but doesn't fully capture their voice or feels passive
-- Below 60: Poor match, feels generic, inauthentic, or too passive
+SCORING GUIDELINES (more granular):
+- 95-100: Exceptional match, perfectly captures authentic voice with outstanding engagement
+- 90-94: Excellent match, very close to authentic voice with strong engagement
+- 85-89: Very good match with minor style deviations and good conversation flow
+- 80-84: Good match but missing some authentic elements or engagement
+- 75-79: Fairly good match with noticeable style gaps
+- 70-74: Fair match but doesn't fully capture their voice or feels passive
+- 65-69: Below average match, feels somewhat generic
+- 60-64: Poor match, feels inauthentic or too passive
+- Below 60: Very poor match, feels completely generic or inappropriate
 
 STYLOMETRIC ANALYSIS:
 - Check for consistent vocabulary patterns and word choices
@@ -415,10 +414,12 @@ AUTHENTIC STYLE PROFILE:
 - Communication patterns: ${styleProfile.communication_patterns?.message_length || "varies"} length, ${styleProfile.communication_patterns?.punctuation_style || "standard"} punctuation, ${styleProfile.communication_patterns?.capitalization || "proper"} capitalization
 - Personality traits: Openness ${styleProfile.traits?.openness || 5}/10, Expressiveness ${styleProfile.traits?.expressiveness || 5}/10, Humor ${styleProfile.traits?.humor || 5}/10, Empathy ${styleProfile.traits?.empathy || 5}/10
 
+${previousScore !== null && previousScore !== undefined ? `PREVIOUS SCORE: ${previousScore}/100` : 'FIRST EVALUATION'}
+
 AI RESPONSE TO EVALUATE:
 "${twinReply}"
 
-Score the authenticity (0-100) focusing on how well it captures ${personaName}'s authentic voice and personality, and provide 2-3 specific improvement tips.`
+Score the authenticity (0-100) focusing on how well it captures ${personaName}'s authentic voice and personality. ${previousScore !== null && previousScore !== undefined ? `Consider if this response shows improvement, decline, or consistency compared to the previous score of ${previousScore}.` : 'This is the first evaluation, so establish a baseline score.'} Provide 2-3 specific improvement tips.`
         }
       ],
       max_tokens: 220
