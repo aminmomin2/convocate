@@ -38,7 +38,7 @@ function deduplicateMessages(messages: Msg[]): Msg[] {
 }
 
 // Helper function to enhance prompts based on conversation context
-function getContextualPromptEnhancement(limitedContextMessages: ChatCompletionMessageParam[], personaName: string): string {
+function getContextualPromptEnhancement(limitedContextMessages: ChatCompletionMessageParam[]): string {
   const recentMessages = limitedContextMessages.slice(-6); // Last 6 messages
   const personaMessages = recentMessages.filter(msg => msg.role === 'assistant');
   const userMessages = recentMessages.filter(msg => msg.role === 'user');
@@ -257,7 +257,7 @@ export async function POST(req: Request) {
     const EXAMPLES = (styleProfile.examples ?? []).slice(0,2);
 
     // Get contextual enhancement based on conversation history
-    const contextualEnhancement = getContextualPromptEnhancement(limitedContextMessages, personaName);
+    const contextualEnhancement = getContextualPromptEnhancement(limitedContextMessages);
 
     // Enhanced exemplar retrieval for better authenticity
     const exemplarMessages = styleProfile.examples?.slice(0, 3) || [];
