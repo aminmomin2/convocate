@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import PersonaNaming from './PersonaNaming';
 
 import { Msg, StoredPersona } from '@/types/persona';
-import { getUsageInfo, updateTotalPersonasCreated, updateUsageFromUpload } from '@/utils/fetcher';
+import { updateUsageFromUpload } from '@/utils/fetcher';
 
 const MAX_FILE_SIZE_MB = 10;
 

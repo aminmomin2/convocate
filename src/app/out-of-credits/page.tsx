@@ -24,7 +24,7 @@ export default function OutOfCredits() {
         <CardContent className="space-y-6 px-8 pb-8">
           <div className="text-sm text-gray-700 dark:text-gray-200 space-y-4 leading-relaxed">
             <p className="text-base">
-              Hey there! I'm a solo developer building this AI persona chat tool, and I'm stoked that you want to try it out! 🚀
+              Hey there! I&apos;m a solo developer building this AI persona chat tool, and I&apos;m stoked that you want to try it out! 🚀
             </p>
             <p className="text-base">
               Unfortunately, my $10 monthly API budget got used up faster than I expected <span className="text-green-600 dark:text-green-400 font-medium">(which is actually pretty cool - means people are using it!)</span>.
@@ -35,12 +35,12 @@ export default function OutOfCredits() {
                 <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                What's happening:
+                What&apos;s happening:
               </p>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span>Chat is temporarily disabled <span className="text-gray-500 dark:text-gray-400">(I'm just one person with a limited budget)</span></span>
+                  <span>Chat is temporarily disabled <span className="text-gray-500 dark:text-gray-400">(I&apos;m just one person with a limited budget)</span></span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
@@ -48,7 +48,7 @@ export default function OutOfCredits() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span>I'll add more credits as soon as I can</span>
+                  <span>I&apos;ll add more credits as soon as I can</span>
                 </li>
               </ul>
             </div>
@@ -62,8 +62,8 @@ export default function OutOfCredits() {
                 </svg>
               </div>
               <div className="text-sm text-blue-800 dark:text-blue-200">
-                <p className="font-semibold mb-1">Want to know when it's back up?</p>
-                <p className="text-blue-600 dark:text-blue-300 mb-2">Follow me on social media - I'll post updates there!</p>
+                <p className="font-semibold mb-1">Want to know when it&apos;s back up?</p>
+                <p className="text-blue-600 dark:text-blue-300 mb-2">Follow me on social media - I&apos;ll post updates there!</p>
                 <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg px-3 py-2 inline-block">
                   <span className="font-mono text-blue-700 dark:text-blue-300 font-semibold">@aminmomin312</span>
                 </div>
