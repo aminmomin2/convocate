@@ -4,10 +4,10 @@ import Link from 'next/link';
 import PersonaSelector from '@/components/PersonaSelector';
 import ChatWindow from '@/components/ChatWindow';
 import ScorePanel from '@/components/ScorePanel';
-import { StoredPersona } from '@/types/persona';
+import { StoredPersona, StyleProfile } from '@/types/persona';
 import { clearPersonaHistory } from '@/utils/clearData';
 import { useToast } from '@/components/ui/toast';
-import { Target, ArrowLeft, Lightbulb, Trash2, Palette } from 'lucide-react';
+import { Target, ArrowLeft, Lightbulb, Trash2, Palette, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface PersonaDetailPageProps {
   params: Promise<{
@@ -28,6 +28,517 @@ interface ScorePanelData {
     totalMessagesUsed: number;
     maxMessagesPerIP: number;
   } | null;
+}
+
+// Expandable list component for showing limited items with "show more" functionality
+interface ExpandableListProps<T> {
+  items: T[];
+  renderItem: (item: T, index: number) => React.ReactNode;
+  initialCount?: number;
+  moreText?: string;
+}
+
+function ExpandableList<T>({ items, renderItem, initialCount = 8, moreText }: ExpandableListProps<T>) {
+  const [showAll, setShowAll] = useState(false);
+  
+  if (items.length === 0) return null;
+  
+  const displayItems = showAll ? items : items.slice(0, initialCount);
+  const hasMore = items.length > initialCount;
+  const remainingCount = items.length - initialCount;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {displayItems.map(renderItem)}
+      </div>
+      
+      {hasMore && !showAll && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+        >
+          +{remainingCount} more{moreText ? ` ${moreText}` : ''}
+        </button>
+      )}
+      
+      {showAll && hasMore && (
+        <button
+          onClick={() => setShowAll(false)}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Show less
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Collapsible section component (for mobile)
+interface CollapsibleSectionProps {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function CollapsibleSection({ title, defaultOpen = false, children }: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="space-y-3">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full text-left font-semibold text-base hover:text-primary transition-colors"
+      >
+        <span>{title}</span>
+        {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </button>
+      
+      {isOpen && (
+        <div className="space-y-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Responsive section wrapper - collapsible on mobile, always open on desktop
+interface ResponsiveSectionProps {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function ResponsiveSection({ title, defaultOpen = true, children }: ResponsiveSectionProps) {
+  return (
+    <>
+      {/* Desktop version - always expanded */}
+      <div className="hidden md:block space-y-4">
+        <h3 className="font-semibold text-base">{title}</h3>
+        <div className="space-y-3">
+          {children}
+        </div>
+      </div>
+      
+      {/* Mobile version - collapsible */}
+      <div className="block md:hidden">
+        <CollapsibleSection title={title} defaultOpen={defaultOpen}>
+          {children}
+        </CollapsibleSection>
+      </div>
+    </>
+  );
+}
+
+// Trait bar component
+interface TraitBarProps {
+  label: string;
+  value: number;
+}
+
+function TraitBar({ label, value }: TraitBarProps) {
+  return (
+    <div className="p-3 bg-muted/30 rounded-lg">
+      <h4 className="font-medium text-sm mb-1">{label}</h4>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 bg-muted rounded-full h-2">
+          <div 
+            className="bg-primary h-2 rounded-full transition-all duration-300" 
+            style={{ width: `${value * 100}%` }}
+          ></div>
+        </div>
+        <span className="text-xs text-muted-foreground">{value * 10}/10</span>
+      </div>
+    </div>
+  );
+}
+
+// Enhanced style profile display component
+interface StyleProfileDisplayProps {
+  styleProfile: StyleProfile;
+}
+
+function StyleProfileDisplay({ styleProfile }: StyleProfileDisplayProps) {
+  return (
+    <div className="space-y-6">
+      {/* Communication Style */}
+      <ResponsiveSection title="Communication Style" defaultOpen={true}>
+        <div className="grid grid-cols-1 gap-3">
+          <div className="p-3 bg-muted/30 rounded-lg">
+            <h4 className="font-medium text-sm mb-1">Tone</h4>
+            <p className="text-sm text-muted-foreground break-words">{styleProfile.tone}</p>
+          </div>
+          
+          <div className="p-3 bg-muted/30 rounded-lg">
+            <h4 className="font-medium text-sm mb-1">Formality</h4>
+            <p className="text-sm text-muted-foreground capitalize">{styleProfile.formality}</p>
+          </div>
+          
+          <div className="p-3 bg-muted/30 rounded-lg">
+            <h4 className="font-medium text-sm mb-1">Pacing</h4>
+            <p className="text-sm text-muted-foreground break-words">{styleProfile.pacing}</p>
+          </div>
+        </div>
+      </ResponsiveSection>
+
+      {/* Personality Traits */}
+      {styleProfile.traits && (
+        <ResponsiveSection title="Personality Traits" defaultOpen={true}>
+          <div className="grid grid-cols-2 gap-3">
+            <TraitBar label="Openness" value={styleProfile.traits.openness || 5} />
+            <TraitBar label="Expressiveness" value={styleProfile.traits.expressiveness || 5} />
+            <TraitBar label="Humor" value={styleProfile.traits.humor || 5} />
+            <TraitBar label="Empathy" value={styleProfile.traits.empathy || 5} />
+            <TraitBar label="Directness" value={styleProfile.traits.directness || 5} />
+            <TraitBar label="Enthusiasm" value={styleProfile.traits.enthusiasm || 5} />
+          </div>
+        </ResponsiveSection>
+      )}
+
+      {/* Signature Vocabulary */}
+      {styleProfile.vocabulary && styleProfile.vocabulary.length > 0 && (
+        <ResponsiveSection title="Signature Vocabulary">
+          <ExpandableList
+            items={styleProfile.vocabulary}
+            renderItem={(word, index) => (
+              <span key={index} className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
+                {word}
+              </span>
+            )}
+            initialCount={10}
+            moreText="words"
+          />
+        </ResponsiveSection>
+      )}
+
+      {/* Quirks */}
+      {styleProfile.quirks && styleProfile.quirks.length > 0 && (
+        <ResponsiveSection title="Communication Quirks">
+          <ExpandableList
+            items={styleProfile.quirks}
+            renderItem={(quirk, index) => (
+              <div key={index} className="p-3 bg-muted/30 rounded-lg">
+                <p className="text-sm text-muted-foreground">{quirk}</p>
+              </div>
+            )}
+            initialCount={5}
+            moreText="quirks"
+          />
+        </ResponsiveSection>
+      )}
+
+      {/* Emotional Profile */}
+      {styleProfile.emotions && (
+        <ResponsiveSection title="Emotional Profile">
+          <div className="space-y-3">
+            {styleProfile.emotions.primary && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Primary Emotion</h4>
+                <p className="text-sm text-muted-foreground capitalize">{styleProfile.emotions.primary}</p>
+              </div>
+            )}
+            
+            {styleProfile.emotions.secondary && styleProfile.emotions.secondary.length > 0 && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Secondary Emotions</h4>
+                <ExpandableList
+                  items={styleProfile.emotions.secondary}
+                  renderItem={(emotion, index) => (
+                    <span key={index} className="px-2 py-1 bg-secondary/20 text-secondary-foreground rounded text-xs">
+                      {emotion}
+                    </span>
+                  )}
+                  initialCount={6}
+                  moreText="emotions"
+                />
+              </div>
+            )}
+
+            {styleProfile.emotions.triggers && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {styleProfile.emotions.triggers.positive && styleProfile.emotions.triggers.positive.length > 0 && (
+                  <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1 text-green-700 dark:text-green-300">Positive Triggers</h4>
+                    <ExpandableList
+                      items={styleProfile.emotions.triggers.positive}
+                      renderItem={(trigger, index) => (
+                        <div key={index} className="text-xs text-green-600 dark:text-green-400">• {trigger}</div>
+                      )}
+                      initialCount={5}
+                      moreText="triggers"
+                    />
+                  </div>
+                )}
+                
+                {styleProfile.emotions.triggers.negative && styleProfile.emotions.triggers.negative.length > 0 && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1 text-red-700 dark:text-red-300">Negative Triggers</h4>
+                    <ExpandableList
+                      items={styleProfile.emotions.triggers.negative}
+                      renderItem={(trigger, index) => (
+                        <div key={index} className="text-xs text-red-600 dark:text-red-400">• {trigger}</div>
+                      )}
+                      initialCount={5}
+                      moreText="triggers"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {styleProfile.emotions.mood_patterns && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-2">Mood Patterns</h4>
+                <div className="space-y-2">
+                  {styleProfile.emotions.mood_patterns.typical_mood && (
+                    <div>
+                      <span className="text-xs font-medium">Typical Mood: </span>
+                      <span className="text-xs text-muted-foreground">{styleProfile.emotions.mood_patterns.typical_mood}</span>
+                    </div>
+                  )}
+                  {styleProfile.emotions.mood_patterns.mood_indicators && styleProfile.emotions.mood_patterns.mood_indicators.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium">Mood Indicators: </span>
+                      <ExpandableList
+                        items={styleProfile.emotions.mood_patterns.mood_indicators}
+                        renderItem={(indicator, index) => (
+                          <span key={index} className="text-xs text-muted-foreground">{indicator}</span>
+                        )}
+                        initialCount={3}
+                        moreText="indicators"
+                      />
+                    </div>
+                  )}
+                  {styleProfile.emotions.mood_patterns.stress_indicators && styleProfile.emotions.mood_patterns.stress_indicators.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium">Stress Indicators: </span>
+                      <ExpandableList
+                        items={styleProfile.emotions.mood_patterns.stress_indicators}
+                        renderItem={(indicator, index) => (
+                          <span key={index} className="text-xs text-muted-foreground">{indicator}</span>
+                        )}
+                        initialCount={3}
+                        moreText="indicators"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </ResponsiveSection>
+      )}
+
+      {/* Communication Preferences */}
+      {styleProfile.preferences && (
+        <ResponsiveSection title="Communication Preferences">
+          <div className="space-y-3">
+            {styleProfile.preferences.topics && styleProfile.preferences.topics.length > 0 && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Preferred Topics</h4>
+                <ExpandableList
+                  items={styleProfile.preferences.topics}
+                  renderItem={(topic, index) => (
+                    <span key={index} className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
+                      {topic}
+                    </span>
+                  )}
+                  initialCount={8}
+                  moreText="topics"
+                />
+              </div>
+            )}
+
+            {styleProfile.preferences.avoids && styleProfile.preferences.avoids.length > 0 && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Topics to Avoid</h4>
+                <ExpandableList
+                  items={styleProfile.preferences.avoids}
+                  renderItem={(avoid, index) => (
+                    <span key={index} className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-xs">
+                      {avoid}
+                    </span>
+                  )}
+                  initialCount={6}
+                  moreText="topics"
+                />
+              </div>
+            )}
+
+            {styleProfile.preferences.engagement && styleProfile.preferences.engagement.length > 0 && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Engagement Style</h4>
+                <ExpandableList
+                  items={styleProfile.preferences.engagement}
+                  renderItem={(style, index) => (
+                    <div key={index} className="text-sm text-muted-foreground">• {style}</div>
+                  )}
+                  initialCount={5}
+                  moreText="engagement patterns"
+                />
+              </div>
+            )}
+
+            {styleProfile.preferences.relationship_dynamics && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-2">Relationship Dynamics</h4>
+                <div className="space-y-2">
+                  {styleProfile.preferences.relationship_dynamics.power_position && (
+                    <div>
+                      <span className="text-xs font-medium">Power Position: </span>
+                      <span className="text-xs text-muted-foreground">{styleProfile.preferences.relationship_dynamics.power_position}</span>
+                    </div>
+                  )}
+                  {styleProfile.preferences.relationship_dynamics.boundary_style && (
+                    <div>
+                      <span className="text-xs font-medium">Boundary Style: </span>
+                      <span className="text-xs text-muted-foreground">{styleProfile.preferences.relationship_dynamics.boundary_style}</span>
+                    </div>
+                  )}
+                  {styleProfile.preferences.relationship_dynamics.trust_indicators && styleProfile.preferences.relationship_dynamics.trust_indicators.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium">Trust Indicators: </span>
+                      <ExpandableList
+                        items={styleProfile.preferences.relationship_dynamics.trust_indicators}
+                        renderItem={(indicator, index) => (
+                          <span key={index} className="text-xs text-muted-foreground">{indicator}</span>
+                        )}
+                        initialCount={3}
+                        moreText="indicators"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {styleProfile.preferences.context_preferences && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {styleProfile.preferences.context_preferences.formal_contexts && styleProfile.preferences.context_preferences.formal_contexts.length > 0 && (
+                  <div className="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1">Formal Contexts</h4>
+                    <ExpandableList
+                      items={styleProfile.preferences.context_preferences.formal_contexts}
+                      renderItem={(context, index) => (
+                        <div key={index} className="text-xs text-muted-foreground">• {context}</div>
+                      )}
+                      initialCount={4}
+                      moreText="contexts"
+                    />
+                  </div>
+                )}
+                
+                {styleProfile.preferences.context_preferences.casual_contexts && styleProfile.preferences.context_preferences.casual_contexts.length > 0 && (
+                  <div className="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1">Casual Contexts</h4>
+                    <ExpandableList
+                      items={styleProfile.preferences.context_preferences.casual_contexts}
+                      renderItem={(context, index) => (
+                        <div key={index} className="text-xs text-muted-foreground">• {context}</div>
+                      )}
+                      initialCount={4}
+                      moreText="contexts"
+                    />
+                  </div>
+                )}
+                
+                {styleProfile.preferences.context_preferences.work_contexts && styleProfile.preferences.context_preferences.work_contexts.length > 0 && (
+                  <div className="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1">Work Contexts</h4>
+                    <ExpandableList
+                      items={styleProfile.preferences.context_preferences.work_contexts}
+                      renderItem={(context, index) => (
+                        <div key={index} className="text-xs text-muted-foreground">• {context}</div>
+                      )}
+                      initialCount={4}
+                      moreText="contexts"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </ResponsiveSection>
+      )}
+
+      {/* Communication Patterns */}
+      {styleProfile.communication_patterns && (
+        <ResponsiveSection title="Communication Patterns">
+          <div className="grid grid-cols-1 gap-3">
+            {styleProfile.communication_patterns.message_length && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Message Length</h4>
+                <p className="text-sm text-muted-foreground capitalize">{styleProfile.communication_patterns.message_length}</p>
+              </div>
+            )}
+            
+            {styleProfile.communication_patterns.punctuation_style && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Punctuation Style</h4>
+                <p className="text-sm text-muted-foreground capitalize">{styleProfile.communication_patterns.punctuation_style}</p>
+              </div>
+            )}
+            
+            {styleProfile.communication_patterns.capitalization && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Capitalization</h4>
+                <p className="text-sm text-muted-foreground capitalize">{styleProfile.communication_patterns.capitalization}</p>
+              </div>
+            )}
+
+            {styleProfile.communication_patterns.abbreviations && styleProfile.communication_patterns.abbreviations.length > 0 && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Common Abbreviations</h4>
+                <ExpandableList
+                  items={styleProfile.communication_patterns.abbreviations}
+                  renderItem={(abbrev, index) => (
+                    <span key={index} className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs">
+                      {abbrev}
+                    </span>
+                  )}
+                  initialCount={8}
+                  moreText="abbreviations"
+                />
+              </div>
+            )}
+
+            {styleProfile.communication_patterns.unique_expressions && styleProfile.communication_patterns.unique_expressions.length > 0 && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <h4 className="font-medium text-sm mb-1">Unique Expressions</h4>
+                <ExpandableList
+                  items={styleProfile.communication_patterns.unique_expressions}
+                  renderItem={(expression, index) => (
+                    <span key={index} className="px-2 py-1 bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 rounded text-xs">
+                      {expression}
+                    </span>
+                  )}
+                  initialCount={8}
+                  moreText="expressions"
+                />
+              </div>
+            )}
+          </div>
+        </ResponsiveSection>
+      )}
+
+      {/* Example Messages */}
+      {styleProfile.examples && styleProfile.examples.length > 0 && (
+        <ResponsiveSection title="Example Messages">
+          <ExpandableList
+            items={styleProfile.examples}
+            renderItem={(example, index) => (
+              <div key={index} className="p-3 bg-muted/30 rounded-lg">
+                <p className="text-sm italic break-words">&ldquo;{example}&rdquo;</p>
+              </div>
+            )}
+            initialCount={3}
+            moreText="examples"
+          />
+        </ResponsiveSection>
+      )}
+    </div>
+  );
 }
 
 export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
@@ -492,138 +1003,8 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
                   </p>
                 </div>
 
-                {/* Communication Style */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-base">Communication Style</h3>
-                  
-                  <div className="grid grid-cols-1 gap-3">
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <h4 className="font-medium text-sm mb-1">Tone</h4>
-                      <p className="text-sm text-muted-foreground break-words">{currentPersona.styleProfile.tone}</p>
-                    </div>
-                    
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <h4 className="font-medium text-sm mb-1">Formality</h4>
-                      <p className="text-sm text-muted-foreground capitalize">{currentPersona.styleProfile.formality}</p>
-                    </div>
-                    
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      <h4 className="font-medium text-sm mb-1">Pacing</h4>
-                      <p className="text-sm text-muted-foreground break-words">{currentPersona.styleProfile.pacing}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Vocabulary */}
-                {currentPersona.styleProfile.vocabulary.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-base">Signature Vocabulary</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {currentPersona.styleProfile.vocabulary.slice(0, 8).map((word, index) => (
-                        <span key={index} className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
-                          {word}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Personality Traits */}
-                {currentPersona.styleProfile.traits && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-base">Personality Traits</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Openness</h4>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full" 
-                              style={{ width: `${(currentPersona.styleProfile.traits.openness || 5) * 10}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{currentPersona.styleProfile.traits.openness || 5}/10</span>
-                        </div>
-                      </div>
-                      
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Expressiveness</h4>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full" 
-                              style={{ width: `${(currentPersona.styleProfile.traits.expressiveness || 5) * 10}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{currentPersona.styleProfile.traits.expressiveness || 5}/10</span>
-                        </div>
-                      </div>
-                      
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Humor</h4>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full" 
-                              style={{ width: `${(currentPersona.styleProfile.traits.humor || 5) * 10}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{currentPersona.styleProfile.traits.humor || 5}/10</span>
-                        </div>
-                      </div>
-                      
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Empathy</h4>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted rounded-full h-2">
-                            <div 
-                              className="bg-primary h-2 rounded-full" 
-                              style={{ width: `${(currentPersona.styleProfile.traits.empathy || 5) * 10}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{currentPersona.styleProfile.traits.empathy || 5}/10</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Communication Patterns */}
-                {currentPersona.styleProfile.communication_patterns && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-base">Communication Patterns</h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Message Length</h4>
-                        <p className="text-sm text-muted-foreground capitalize">{currentPersona.styleProfile.communication_patterns.message_length}</p>
-                      </div>
-                      
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Punctuation Style</h4>
-                        <p className="text-sm text-muted-foreground capitalize">{currentPersona.styleProfile.communication_patterns.punctuation_style}</p>
-                      </div>
-                      
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Capitalization</h4>
-                        <p className="text-sm text-muted-foreground capitalize">{currentPersona.styleProfile.communication_patterns.capitalization}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Example Messages */}
-                {currentPersona.styleProfile.examples && currentPersona.styleProfile.examples.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-base">Example Messages</h3>
-                    <div className="space-y-2">
-                      {currentPersona.styleProfile.examples.slice(0, 3).map((example, index) => (
-                        <div key={index} className="p-3 bg-muted/30 rounded-lg">
-                          <p className="text-sm italic break-words">&ldquo;{example}&rdquo;</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Enhanced Style Profile with Collapsible Sections */}
+                <StyleProfileDisplay styleProfile={currentPersona.styleProfile} />
               </div>
             </div>
           </div>

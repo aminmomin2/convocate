@@ -14,12 +14,17 @@ export interface StyleProfile {
   quirks: string[];       // e.g. ["uses emojis", "ends with question"]
   examples: string[];     // 1–2 real snippets from the transcript
   
+  // Communication context
+  formality_context?: "casual" | "mixed" | "formal"; // Detected overall communication style
+  
   // Personality traits for more natural conversation
   traits: {
     openness?: number;      // 1-10: curiosity and openness to new ideas
     expressiveness?: number;// 1-10: emotional expressiveness level
     humor?: number;         // 1-10: tendency to use humor
     empathy?: number;       // 1-10: ability to show understanding
+    directness?: number;    // 1-10: how direct and straightforward they are
+    enthusiasm?: number;    // 1-10: energy and excitement level
   };
   
   // Emotional context
@@ -30,6 +35,11 @@ export interface StyleProfile {
       positive?: string[]; // e.g. ["creative ideas", "problem-solving"]
       negative?: string[]; // e.g. ["rudeness", "confusion"]
     };
+    mood_patterns?: {
+      typical_mood?: string;
+      mood_indicators?: string[];
+      stress_indicators?: string[];
+    };
   };
   
   // Conversation style
@@ -37,6 +47,16 @@ export interface StyleProfile {
     topics?: string[];     // preferred conversation topics
     avoids?: string[];     // topics or approaches to avoid
     engagement?: string[]; // e.g. ["asks follow-up questions", "shares relevant experiences"]
+    relationship_dynamics?: {
+      power_position?: string;
+      trust_indicators?: string[];
+      boundary_style?: string;
+    };
+    context_preferences?: {
+      formal_contexts?: string[];
+      casual_contexts?: string[];
+      work_contexts?: string[];
+    };
   };
   
   // Communication patterns

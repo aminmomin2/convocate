@@ -26,9 +26,9 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
 
 
   const supportedTypes = [
+    { ext: '.txt', desc: 'WhatsApp chat export (recommended - works best!)', recommended: true },
     { ext: '.csv', desc: 'CSV with sender, message, timestamp columns' },
     { ext: '.json', desc: 'JSON array with sender/message objects' },
-    { ext: '.txt', desc: 'WhatsApp chat export format' },
     { ext: '.xml', desc: 'SMS Backup & Restore format' }
   ];
 
@@ -103,17 +103,28 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
     setError('');
     
     try {
+      console.log('Starting upload with files:', selectedFiles.map(f => f.name));
+      
       const formData = new FormData();
       selectedFiles.forEach(file => {
         formData.append('files', file);
+        console.log(`Added file: ${file.name} (${file.size} bytes, ${file.type})`);
       });
 
+      console.log('Making fetch request to /api/upload');
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
+      
+      console.log('Fetch response received:', response.status, response.statusText);
+
+      if (!response.ok) {
+        console.log('Response not OK, attempting to parse error...');
+      }
 
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (!response.ok) {
         // Check if it's a quota exceeded error and redirect
@@ -276,7 +287,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
             <div>
               <p className="text-sm font-medium">Drop files here or click to browse</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Supports CSV, JSON, TXT, and XML files
+                Supports CSV, JSON, TXT, and XML files • <span className="text-green-600 font-medium">TXT works best</span>
               </p>
             </div>
             <input
@@ -316,13 +327,19 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
         {/* Compact Supported Formats */}
         <div className="space-y-2">
           <h4 className="text-xs font-medium">Supported Formats</h4>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {supportedTypes.map((type, index) => (
-              <div key={index} className="flex items-start gap-2 text-xs">
-                <Badge variant="secondary" className="font-mono text-xs">
+              <div key={index} className={`flex items-start gap-2 text-xs ${type.recommended ? 'bg-green-50 border border-green-200 rounded-md p-2' : ''}`}>
+                <Badge 
+                  variant={type.recommended ? "default" : "secondary"} 
+                  className={`font-mono text-xs ${type.recommended ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                >
                   {type.ext}
+                  {type.recommended && <span className="ml-1">⭐</span>}
                 </Badge>
-                <span className="text-muted-foreground text-xs">{type.desc}</span>
+                <span className={`text-xs ${type.recommended ? 'text-green-800 font-medium' : 'text-muted-foreground'}`}>
+                  {type.desc}
+                </span>
               </div>
             ))}
           </div>

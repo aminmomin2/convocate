@@ -260,13 +260,17 @@ export default function Home() {
               </p>
             </div>
             
-            <div className="group bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-purple-200/50 dark:border-purple-700/50 rounded-2xl p-8 text-center space-y-4 hover:shadow-2xl hover:scale-105 transition-all duration-300">
+            <div className="group bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-purple-200/50 dark:border-purple-700/50 rounded-2xl p-8 text-center space-y-4 hover:shadow-2xl hover:scale-105 transition-all duration-300 relative">
+              {/* Best Format Badge */}
+              <div className="absolute -top-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                RECOMMENDED
+              </div>
               <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
                 <span className="text-white font-bold text-xl">TXT</span>
               </div>
-              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Text Export</h3>
+              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Text Export ⭐</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                WhatsApp chat export format (.txt files) with timestamps and sender names in a readable format.
+                <strong className="text-green-600 dark:text-green-400">Works best!</strong> WhatsApp chat export format (.txt files) with timestamps and sender names. Supports multiline messages and various date formats.
               </p>
             </div>
             
