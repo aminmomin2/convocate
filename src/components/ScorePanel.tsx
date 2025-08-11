@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Lightbulb, Target, Trash2 } from 'lucide-react';
 
-
 interface ScorePanelProps {
   isMobile?: boolean;
   score?: number | null;
@@ -11,6 +10,7 @@ interface ScorePanelProps {
   tips?: string[];
   onClearHistory?: () => void;
   hasTrainingHistory?: boolean;
+  isLoading?: boolean; // New loading prop
 }
 
 export default function ScorePanel({ 
@@ -19,7 +19,8 @@ export default function ScorePanel({
   previousScore = null,
   tips = [], 
   onClearHistory,
-  hasTrainingHistory = false
+  hasTrainingHistory = false,
+  isLoading = false // New loading prop
 }: ScorePanelProps) {
   // Use provided score or default
   const outcomeScore = score ?? 0;
@@ -33,8 +34,50 @@ export default function ScorePanel({
     if (current < previous) return 'text-red-600';
     return 'text-primary';
   };
-  
 
+  // Loading skeleton component for score
+  const ScoreLoadingSkeleton = () => (
+    <div className="flex flex-col items-center space-y-3">
+      <div className="relative">
+        <div className={`${isMobile ? 'w-16 h-16' : 'w-24 h-24'} rounded-full bg-gradient-to-br from-muted to-muted/60 animate-pulse`} />
+        {/* Inner circle with shimmer effect */}
+        <div className={`absolute inset-2 ${isMobile ? 'w-12 h-12' : 'w-20 h-20'} rounded-full bg-gradient-to-br from-muted/80 to-muted/40 animate-pulse`} />
+      </div>
+      <div className="text-center space-y-2">
+        <div className={`${isMobile ? 'h-3 w-16' : 'h-4 w-20'} bg-gradient-to-r from-muted to-muted/60 rounded animate-pulse mx-auto`} />
+        {!isMobile && (
+          <div className="h-3 w-32 bg-gradient-to-r from-muted/80 to-muted/40 rounded animate-pulse mx-auto" />
+        )}
+      </div>
+    </div>
+  );
+
+  // Loading skeleton component for tips
+  const TipsLoadingSkeleton = () => (
+    <div className={`${isMobile ? 'space-y-2' : 'space-y-3'}`}>
+      {[1, 2, 3].map((index) => (
+        <div key={index} className="flex items-start gap-2">
+          <div className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} rounded-full bg-gradient-to-br from-muted to-muted/60 animate-pulse flex-shrink-0`} />
+          <div className="flex-1 space-y-1">
+            <div 
+              className={`${isMobile ? 'h-2' : 'h-3'} bg-gradient-to-r from-muted to-muted/60 rounded animate-pulse`} 
+              style={{ 
+                width: `${Math.random() * 40 + 60}%`,
+                animationDelay: `${index * 100}ms`
+              }} 
+            />
+            <div 
+              className={`${isMobile ? 'h-2' : 'h-3'} bg-gradient-to-r from-muted/80 to-muted/40 rounded animate-pulse`} 
+              style={{ 
+                width: `${Math.random() * 30 + 40}%`,
+                animationDelay: `${index * 150}ms`
+              }} 
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className={`space-y-4 ${isMobile ? '' : 'h-full flex flex-col'}`}>
@@ -42,12 +85,21 @@ export default function ScorePanel({
       <Card className={`flex-shrink-0 ${isMobile ? 'shadow-none border-none bg-transparent' : ''}`}>
         <CardHeader className={`${isMobile ? 'pb-1' : 'pb-3'}`}>
           <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-base'}`}>
-            <Target className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} text-primary`} />
+            <Target className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} text-primary ${isLoading ? 'animate-pulse' : ''}`} />
             {isMobile ? 'Score' : 'Outcome Score'}
+            {isLoading && (
+              <div className="flex space-x-1 ml-2">
+                <div className="w-1 h-1 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1 h-1 bg-primary rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                <div className="w-1 h-1 bg-primary rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {hasScore ? (
+          {isLoading || (hasScore && score === 0) ? (
+            <ScoreLoadingSkeleton />
+          ) : hasScore && score !== 0 ? (
             /* Score Circle/Gauge */
             <div className="flex flex-col items-center space-y-3">
               <div className="relative">
@@ -124,12 +176,21 @@ export default function ScorePanel({
       <Card className={`flex-1 min-h-0 ${isMobile ? 'shadow-none border-none bg-transparent' : ''}`}>
         <CardHeader className={`${isMobile ? 'pb-1' : 'pb-3'}`}>
           <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-xs' : 'text-base'}`}>
-            <Lightbulb className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} text-yellow-500`} />
+            <Lightbulb className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} text-yellow-500 ${isLoading ? 'animate-pulse' : ''}`} />
             {isMobile ? 'Tips' : 'Tips for Improvement'}
+            {isLoading && (
+              <div className="flex space-x-1 ml-2">
+                <div className="w-1 h-1 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1 h-1 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                <div className="w-1 h-1 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {hasTips ? (
+          {isLoading || (hasTips && tips.length === 1 && tips[0] === "Response generated. Scoring in progress.") ? (
+            <TipsLoadingSkeleton />
+          ) : hasTips ? (
             <ul className={`${isMobile ? 'space-y-1' : 'space-y-2'}`}>
               {tips.map((tip, index) => (
                 <li key={index} className="flex items-start gap-2">

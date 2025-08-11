@@ -10,11 +10,13 @@ const MAX_MESSAGE_LENGTH = 4000; // Match the API limit
 interface ChatWindowProps {
   personaId: string;
   onScoreUpdate?: (score: number | null, tips: string[]) => void;
+  onScoringStart?: () => void;
   onMessageCountUpdate?: (count: number) => void;
   onUsageInfoUpdate?: (usage: {
     totalMessagesUsed: number;
     maxMessagesPerIP: number;
   } | null) => void;
+  isMobile?: boolean; // New prop to handle mobile layout
 }
 
 interface UsageInfo {
@@ -22,7 +24,115 @@ interface UsageInfo {
   maxMessagesPerIP: number;
 }
 
-export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpdate, onUsageInfoUpdate }: ChatWindowProps) {
+// Typing Indicator Component
+const TypingIndicator = () => (
+  <div className="flex justify-start">
+    <div className="max-w-[80%] rounded-lg p-3 bg-muted">
+      <div className="flex items-center gap-2 mb-1">
+        <Badge variant="outline" className="text-xs">
+          AI Persona
+        </Badge>
+        <span className="text-xs opacity-70">
+          {new Date().toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })}
+        </span>
+      </div>
+      <div className="flex items-center space-x-1">
+        <div className="flex space-x-1">
+          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        </div>
+        <span className="text-xs text-muted-foreground ml-2">AI is typing...</span>
+      </div>
+    </div>
+  </div>
+);
+
+// Scoring Loading Indicator Component
+const ScoringLoadingIndicator = () => (
+  <div className="flex justify-center my-4">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
+      <div className="flex items-center gap-3">
+        <div className="flex space-x-1">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-blue-800">Analyzing your response...</p>
+          <p className="text-xs text-blue-600">Getting personalized feedback and tips</p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Streaming Message Component
+const StreamingMessage = ({ content, sender, timestamp, isNewMessage = false }: { content: string; sender: 'user' | 'persona'; timestamp: Date; isNewMessage?: boolean }) => {
+  const [displayedContent, setDisplayedContent] = useState('');
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (sender === 'user' || !isNewMessage) {
+      // User messages and old messages show immediately
+      setDisplayedContent(content);
+      setIsComplete(true);
+      return;
+    }
+
+    // Only new AI messages stream character by character
+    let currentIndex = 0;
+    const streamInterval = setInterval(() => {
+      if (currentIndex < content.length) {
+        setDisplayedContent(content.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        setIsComplete(true);
+        clearInterval(streamInterval);
+      }
+    }, 30); // Adjust speed here (lower = faster)
+
+    return () => clearInterval(streamInterval);
+  }, [content, sender, isNewMessage]);
+
+  return (
+    <div className={`flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[80%] rounded-lg p-3 ${
+          sender === 'user'
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted'
+        }`}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <Badge 
+            variant={sender === 'user' ? 'secondary' : 'outline'}
+            className="text-xs"
+          >
+            {sender === 'user' ? 'You' : 'AI Persona'}
+          </Badge>
+          <span className="text-xs opacity-70">
+            {timestamp.toLocaleTimeString([], { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </span>
+        </div>
+        <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+          {displayedContent}
+          {!isComplete && sender === 'persona' && isNewMessage && (
+            <span className="inline-block w-0.5 h-4 bg-current animate-pulse ml-0.5"></span>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default function ChatWindow({ personaId, onScoreUpdate, onScoringStart, onMessageCountUpdate, onUsageInfoUpdate, isMobile = false }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [trainingMessageCount, setTrainingMessageCount] = useState<number>(0);
@@ -31,9 +141,12 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
   const [isLoading, setIsLoading] = useState(false);
   const [currentScore, setCurrentScore] = useState<number | null>(null);
   const [currentTips, setCurrentTips] = useState<string[]>([]);
+  const [isScoringLoading, setIsScoringLoading] = useState(false);
   const [showSamplePrompts, setShowSamplePrompts] = useState(true);
   const [error, setError] = useState<string>('');
   const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Sample prompts that will be shown to users
@@ -192,6 +305,12 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
 
     const updatedMessages = [...messages, newUserMessage];
     setMessages(updatedMessages);
+    
+    // Mark user message as new
+    setNewMessageIds(prev => new Set([...prev, newUserMessage.id]));
+
+    // Show typing indicator
+    setIsTyping(true);
 
     try {
       // Prepare chat history in the format expected by the API
@@ -203,7 +322,6 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
           message: msg.content,
           timestamp: msg.timestamp.toISOString(),
         }));
-
 
       // Call the chat API
       const response = await fetch('/api/chat', {
@@ -239,6 +357,9 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
         throw new Error(data.error || `Chat API error: ${response.status}`);
       }
 
+      // Hide typing indicator
+      setIsTyping(false);
+
       // Add persona response to chat
       const personaResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -249,6 +370,9 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
 
       const finalMessages = [...updatedMessages, personaResponse];
       setMessages(finalMessages);
+      
+      // Mark AI response as new for streaming effect
+      setNewMessageIds(prev => new Set([...prev, personaResponse.id]));
       saveChatHistory(finalMessages);
       
       // Update message count - exclude welcome message
@@ -265,6 +389,51 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
       }
       if (Array.isArray(data.tips)) {
         setCurrentTips(data.tips);
+      }
+
+      // If we have a scoring ID, poll for results
+      if (data.scoringId) {
+        // Show scoring loading state
+        setIsScoringLoading(true);
+        if (onScoringStart) {
+          onScoringStart();
+        }
+        
+        const pollForScoring = async () => {
+          try {
+            const response = await fetch(`/api/score?id=${data.scoringId}`);
+            if (response.ok) {
+              const scoringData = await response.json();
+              if (scoringData.status === 'complete') {
+                setCurrentScore(scoringData.score);
+                setCurrentTips(scoringData.tips);
+                setIsScoringLoading(false);
+                
+                // Notify parent component of score/tips update
+                if (onScoreUpdate) {
+                  onScoreUpdate(scoringData.score, scoringData.tips);
+                }
+              } else if (scoringData.status === 'not_found') {
+                // Stop polling if not found
+                setIsScoringLoading(false);
+                return;
+              } else {
+                // Continue polling
+                setTimeout(pollForScoring, 1000);
+              }
+            } else {
+              // Continue polling on error
+              setTimeout(pollForScoring, 1000);
+            }
+          } catch (error) {
+            console.error('Failed to poll for scoring:', error);
+            // Continue polling on error
+            setTimeout(pollForScoring, 1000);
+          }
+        };
+
+        // Start polling after a short delay
+        setTimeout(pollForScoring, 1000);
       }
       
       // Update usage information if provided
@@ -287,6 +456,9 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
 
     } catch (error) {
       console.error('Failed to send message:', error);
+      
+      // Hide typing indicator
+      setIsTyping(false);
       
       // Add error message to chat
       const errorMessage: ChatMessage = {
@@ -337,30 +509,38 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
 
   return (
     <div className="h-full relative bg-background">
-      {/* Chat Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 border-b border-border bg-background z-10">
-        <h2 className="text-lg font-semibold">Training Session</h2>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-muted-foreground">
-            Practice your sales skills with AI guidance
-          </p>
-          {trainingMessageCount > 0 && (
-            <Badge variant="outline" className="text-xs">
-              Trained on {trainingMessageCount} messages
-            </Badge>
+      {/* Chat Header - Hidden on mobile */}
+      {!isMobile && (
+        <div className="absolute top-0 left-0 right-0 p-4 border-b border-border bg-background z-10">
+          <h2 className="text-lg font-semibold">Training Session</h2>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">
+              Practice your sales skills with AI guidance
+            </p>
+            {trainingMessageCount > 0 && (
+              <Badge variant="outline" className="text-xs">
+                Trained on {trainingMessageCount} messages
+              </Badge>
+            )}
+          </div>
+          
+          {/* Usage Information */}
+          {usageInfo && (
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span>Total Messages: {usageInfo.totalMessagesUsed}/{usageInfo.maxMessagesPerIP}</span>
+            </div>
           )}
         </div>
-        
-        {/* Usage Information */}
-        {usageInfo && (
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span>Total Messages: {usageInfo.totalMessagesUsed}/{usageInfo.maxMessagesPerIP}</span>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Messages Area - Scrollable */}
-      <div className="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto p-4 space-y-4 scrollbar-hide" style={{ top: usageInfo ? '120px' : '90px', bottom: '90px' }}>
+      <div 
+        className="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto p-4 space-y-4 scrollbar-hide" 
+        style={{ 
+          top: isMobile ? '0px' : (usageInfo ? '120px' : '90px'), 
+          bottom: '90px' 
+        }}
+      >
         {/* Error Display */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
@@ -402,35 +582,18 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
         )}
         
         {messages.map((message) => (
-          <div
+          <StreamingMessage
             key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.sender === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <Badge 
-                  variant={message.sender === 'user' ? 'secondary' : 'outline'}
-                  className="text-xs"
-                >
-                  {message.sender === 'user' ? 'You' : 'AI Persona'}
-                </Badge>
-                <span className="text-xs opacity-70">
-                  {message.timestamp.toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                </span>
-              </div>
-              <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
-            </div>
-          </div>
+            content={message.content}
+            sender={message.sender}
+            timestamp={message.timestamp}
+            isNewMessage={newMessageIds.has(message.id)}
+          />
         ))}
+        
+        {/* Typing Indicator */}
+        {isTyping && <TypingIndicator />}
+        
         <div ref={messagesEndRef} />
       </div>
 
@@ -465,7 +628,10 @@ export default function ChatWindow({ personaId, onScoreUpdate, onMessageCountUpd
             className="px-3 flex-shrink-0"
           >
             {isLoading ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs">AI thinking...</span>
+              </div>
             ) : (
               <Send className="w-4 h-4" />
             )}

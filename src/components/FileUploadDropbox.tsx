@@ -14,6 +14,22 @@ interface FileUploadDropboxProps {
   onUploadSuccess?: (data: { sessionId: string; personas: StoredPersona[] }) => void;
 }
 
+// Progress Bar Component
+const ProgressBar = ({ progress, status }: { progress: number; status: string }) => (
+  <div className="w-full space-y-2">
+    <div className="flex justify-between text-xs text-muted-foreground">
+      <span>{status}</span>
+      <span>{Math.round(progress)}%</span>
+    </div>
+    <div className="w-full bg-muted rounded-full h-2">
+      <div 
+        className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  </div>
+);
+
 export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropboxProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -22,7 +38,8 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
   const [uploadedPersonas, setUploadedPersonas] = useState<StoredPersona[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
   const [error, setError] = useState<string>('');
-
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
 
 
   const supportedTypes = [
@@ -101,6 +118,8 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
 
     setIsUploading(true);
     setError('');
+    setUploadProgress(0);
+    setUploadStatus('Preparing files...');
     
     try {
       console.log('Starting upload with files:', selectedFiles.map(f => f.name));
@@ -111,30 +130,73 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
         console.log(`Added file: ${file.name} (${file.size} bytes, ${file.type})`);
       });
 
-      console.log('Making fetch request to /api/upload');
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      setUploadProgress(5);
+      setUploadStatus('Uploading files...');
+
+      // Use XMLHttpRequest for progress tracking
+      const xhr = new XMLHttpRequest();
       
-      console.log('Fetch response received:', response.status, response.statusText);
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const uploadPercent = Math.round((event.loaded / event.total) * 80); // Upload is 80% of total process
+          setUploadProgress(5 + uploadPercent);
+          setUploadStatus('Uploading files...');
+        }
+      });
 
-      if (!response.ok) {
-        console.log('Response not OK, attempting to parse error...');
-      }
+      // Create a promise-based wrapper for XMLHttpRequest
+      const uploadPromise = new Promise<{ sessionId: string; personas: StoredPersona[]; errorType?: string; redirectTo?: string; totalPersonasCreated?: number; autoSelectionInfo?: unknown }>((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              resolve(data);
+            } catch (error) {
+              reject(new Error('Invalid response format'));
+            }
+          } else {
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              reject(new Error(errorData.error || `HTTP ${xhr.status}`));
+            } catch {
+              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+            }
+          }
+        });
 
-      const data = await response.json();
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was cancelled'));
+        });
+      });
+
+      // Start the upload
+      xhr.open('POST', '/api/upload');
+      xhr.send(formData);
+
+      // Wait for upload to complete
+      const data = await uploadPromise;
       console.log('Response data:', data);
 
-      if (!response.ok) {
-        // Check if it's a quota exceeded error and redirect
-        if (data.errorType === 'quota_exceeded' && data.redirectTo) {
-          window.location.href = data.redirectTo;
-          return;
-        }
-        throw new Error(data.error || 'Upload failed');
+      // Check for quota exceeded error
+      if (data.errorType === 'quota_exceeded' && data.redirectTo) {
+        window.location.href = data.redirectTo;
+        return;
       }
-      
+
+      setUploadProgress(85);
+      setUploadStatus('Processing files...');
+
+      // Simulate processing time for better UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      setUploadProgress(95);
+      setUploadStatus('Creating personas...');
+
       // Store the uploaded data and transition to naming step
       setSessionId(data.sessionId || Date.now().toString());
       setUploadedPersonas(data.personas);
@@ -146,14 +208,22 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
       
       // Show auto-selection info if provided
       if (data.autoSelectionInfo) {
-
         // You could show a toast or notification here about the auto-selection
       }
       
-      setCurrentStep('naming');
+      setUploadProgress(100);
+      setUploadStatus('Complete!');
+      
+      // Small delay to show completion
+      setTimeout(() => {
+        setCurrentStep('naming');
+      }, 500);
+      
     } catch (error) {
       console.error('Upload error:', error);
       setError(error instanceof Error ? error.message : 'Upload failed. Please try again.');
+      setUploadProgress(0);
+      setUploadStatus('');
     } finally {
       setIsUploading(false);
     }
@@ -345,6 +415,16 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
           </div>
         </div>
 
+        {/* Progress Bar - Show during upload */}
+        {isUploading && (
+          <div className="space-y-3">
+            <ProgressBar progress={uploadProgress} status={uploadStatus} />
+            <div className="text-center text-xs text-muted-foreground">
+              This may take 10-30 seconds depending on file size and conversation length
+            </div>
+          </div>
+        )}
+
         {/* Upload Button */}
         <Button 
           onClick={handleUpload}
@@ -358,7 +438,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Uploading...
+              Please wait...
             </>
           ) : (
             `Upload ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}`

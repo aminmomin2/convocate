@@ -1,5 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import FileUploadDropbox from '@/components/FileUploadDropbox';
 import { Button } from '@/components/ui/button';
 import { clearAllData } from '@/utils/clearData';
@@ -129,14 +130,30 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Enhanced Upload Section */}
-            <div className={`flex justify-center transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <div className="w-full max-w-2xl">
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl shadow-2xl">
-                  <FileUploadDropbox />
+                          {/* Dashboard Navigation Button */}
+              <div className={`flex justify-center transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                <Link href="/dashboard">
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    className="bg-white/20 backdrop-blur-sm border-white/30 text-white hover:bg-white/30 hover:border-white/50 transition-all duration-300 cursor-pointer"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Enhanced Upload Section */}
+              <div className={`flex justify-center transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                <div className="w-full max-w-2xl">
+                  <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl shadow-2xl">
+                    <FileUploadDropbox />
+                  </div>
                 </div>
               </div>
-            </div>
           </div>
         </div>
       </section>

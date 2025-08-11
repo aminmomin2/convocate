@@ -13,6 +13,16 @@ interface ChatRequestBody {
   previousScore?: number | null;
 }
 
+interface ScoringResult {
+  score: number;
+  tips: string[];
+}
+
+// Extend global to include our cache
+declare global {
+  var scoringCache: Map<string, Promise<ScoringResult>> | undefined;
+}
+
 const MAX_MESSAGES_PER_IP = 40;
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_CONTEXT_MESSAGES = 20;
@@ -213,7 +223,7 @@ export async function POST(req: Request) {
     const EXAMPLES = (styleProfile.examples ?? []).slice(0, 2);
     const contextualEnhancement = getContextualPromptEnhancement(limitedContextMessages);
 
-    // ---------- 1) GENERATION (gpt-5-mini) ----------
+    // ---------- OPTIMIZED GENERATION (with optional scoring) ----------
     // Advanced authenticity prompting with behavioral modeling
     const getBehavioralProfile = (styleProfile: StyleProfile) => {
       const traits = styleProfile.traits || {};
@@ -276,43 +286,42 @@ ${EXAMPLES.length > 0 ? `AUTHENTIC EXAMPLES:\n${EXAMPLES.slice(0, 2).map((ex) =>
       { role: "user", content: userMessage },
     ];
 
-    // Prefer Responses API; fallback to Chat Completions
+    // Generate response first (this is what users care about most)
     let twinReply = "";
     try {
       if (hasResponses(openai)) {
         const res = await openai.responses.create({
           model: MODEL_CHAT,
           temperature: CHAT_TEMP,
-
           input: chatMessages,
         });
-        // Try to read unified output_text first; fallback to content
-        twinReply =
-          (res as { output_text?: string }).output_text ??
+        twinReply = (res as { output_text?: string }).output_text ??
           ((res as { output?: Array<{ content?: Array<{ text?: string }> }> }).output?.[0]?.content?.[0]?.text as string | undefined) ??
           "";
       } else {
         const res = await openai.chat.completions.create({
           model: MODEL_CHAT,
           temperature: CHAT_TEMP,
-
           messages: chatMessages,
         });
         twinReply = res.choices?.[0]?.message?.content?.trim() ?? "";
       }
     } catch (e) {
       console.error("[chat] generation error:", e);
-      // For MVP: Return error instead of empty response
       return NextResponse.json(
         { error: "Unable to generate response. Please try again." },
         { status: 500 }
       );
     }
 
-    // ---------- 2) SCORING (gpt-5-nano) ----------
-    const scoringSystem = "Score how well this AI response matches the person's authentic messaging style. Return JSON only.";
+    // Generate a unique ID for this scoring request
+    const scoringId = `score_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const scoringUser = `Score ${personaName}'s style match (0-100):
+    // Start scoring asynchronously and store results
+    const scoringPromise = (async (): Promise<ScoringResult> => {
+      try {
+        const scoringSystem = "Score how well this AI response matches the person's authentic messaging style. Return JSON only.";
+        const scoringUser = `Score ${personaName}'s style match (0-100):
 
 STYLE: ${styleProfile.tone}, ${styleProfile.formality}
 VOCAB: ${(styleProfile.vocabulary ?? []).slice(0, 5).join(", ") || "natural"}
@@ -323,72 +332,81 @@ RESPONSE: "${twinReply}"
 
 Rate: voice authenticity, vocabulary match, quirks/patterns, engagement. Give 2-3 tips (≤140 chars each).`;
 
-    let score = 0;
-    let tips: string[] = [];
-
-    try {
-      if (hasResponses(openai)) {
-        const res = await openai.responses.create({
-          model: MODEL_SCORE,
-          temperature: SCORE_TEMP,
-
-          input: [
-            { role: "system", content: scoringSystem },
-            { role: "user", content: scoringUser },
-          ],
-          text: {
-            format: {
-              type: "json_schema",
-              name: SCORE_SCHEMA.name,
-              schema: SCORE_SCHEMA.schema,
-              strict: true,
+        if (hasResponses(openai)) {
+          const res = await openai.responses.create({
+            model: MODEL_SCORE,
+            temperature: SCORE_TEMP,
+            input: [
+              { role: "system", content: scoringSystem },
+              { role: "user", content: scoringUser },
+            ],
+            text: {
+              format: {
+                type: "json_schema",
+                name: SCORE_SCHEMA.name,
+                schema: SCORE_SCHEMA.schema,
+                strict: true,
+              },
             },
-          },
-        });
-        
-        const text =
-          (res as { output_text?: string }).output_text ??
-          ((res as { output?: Array<{ content?: Array<{ text?: string }> }> }).output?.[0]?.content?.[0]?.text as string | undefined) ??
-          "{}";
-        
-        if (!text || text.trim() === "" || text === "{}") {
-          score = 5; // Default score
-          tips = ["Continue the conversation naturally"];
-        } else {
-          try {
-            const parsed = JSON.parse(text);
-            if (typeof parsed.score === "number") score = parsed.score;
-            if (Array.isArray(parsed.tips)) tips = parsed.tips;
-          } catch {
-            // JSON parsing failed - use defaults
-            score = 5; // Default score
-            tips = ["Continue the conversation naturally"];
+          });
+          
+          const text =
+            (res as { output_text?: string }).output_text ??
+            ((res as { output?: Array<{ content?: Array<{ text?: string }> }> }).output?.[0]?.content?.[0]?.text as string | undefined) ??
+            "{}";
+          
+          if (text && text.trim() !== "" && text !== "{}") {
+            try {
+              const parsed = JSON.parse(text);
+              return {
+                score: typeof parsed.score === "number" ? parsed.score : 5,
+                tips: Array.isArray(parsed.tips) ? parsed.tips : ["Continue the conversation naturally"]
+              };
+            } catch {
+              return { score: 5, tips: ["Continue the conversation naturally"] };
+            }
           }
+        } else {
+          // Fallback to chat.completions w/ schema
+          const res = await openai.chat.completions.create({
+            model: MODEL_SCORE,
+            temperature: SCORE_TEMP,
+            response_format: {
+              type: "json_schema",
+              json_schema: { name: SCORE_SCHEMA.name, schema: SCORE_SCHEMA.schema, strict: true },
+            } as const,
+            messages: [
+              { role: "system", content: scoringSystem },
+              { role: "user", content: scoringUser },
+            ],
+          });
+          const txt = res.choices?.[0]?.message?.content ?? "{}";
+          const parsed = JSON.parse(txt);
+          return {
+            score: typeof parsed.score === "number" ? parsed.score : 5,
+            tips: Array.isArray(parsed.tips) ? parsed.tips : ["Continue the conversation naturally"]
+          };
         }
-      } else {
-        // Fallback to chat.completions w/ schema
-        const res = await openai.chat.completions.create({
-          model: MODEL_SCORE,
-          temperature: SCORE_TEMP,
-
-          response_format: {
-            type: "json_schema",
-            json_schema: { name: SCORE_SCHEMA.name, schema: SCORE_SCHEMA.schema, strict: true },
-          } as const,
-          messages: [
-            { role: "system", content: scoringSystem },
-            { role: "user", content: scoringUser },
-          ],
-        });
-        const txt = res.choices?.[0]?.message?.content ?? "{}";
-        const parsed = JSON.parse(txt);
-        if (typeof parsed.score === "number") score = parsed.score;
-        if (Array.isArray(parsed.tips)) tips = parsed.tips;
+        
+        // Default fallback
+        return { score: 5, tips: ["Continue the conversation naturally"] };
+      } catch (error) {
+        console.error("[chat] scoring error:", error);
+        return { score: 5, tips: ["Continue the conversation naturally"] };
       }
-    } catch {
-      // Scoring failed - use defaults
-      score = 5;
-      tips = ["Continue the conversation naturally"];
+    })();
+
+    // Store the promise in a global cache (in production, use Redis or similar)
+    if (!global.scoringCache) global.scoringCache = new Map();
+    global.scoringCache.set(scoringId, scoringPromise);
+
+    // Clean up old entries (keep last 100)
+    if (global.scoringCache && global.scoringCache.size > 100) {
+      const entries = Array.from(global.scoringCache.entries());
+      global.scoringCache.clear();
+      entries.slice(-50).forEach(([key, value]) => 
+        global.scoringCache!.set(key, value)
+      );
     }
 
     // Response objects for client
@@ -400,10 +418,11 @@ Rate: voice authenticity, vocabulary match, quirks/patterns, engagement. Give 2-
 
     return NextResponse.json({
       twinReply,
-      score,
-      tips,
+      score: 0, // Placeholder, will be updated by scoring endpoint
+      tips: ["Response generated. Scoring in progress."],
       userMessage: userMsg,
       personaMessage: personaMsg,
+      scoringId, // Return the scoring ID
       usage: {
         totalMessagesUsed: totalMessagesUsed + 1,
         maxMessagesPerIP: MAX_MESSAGES_PER_IP,

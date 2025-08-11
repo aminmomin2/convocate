@@ -548,6 +548,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [currentScore, setCurrentScore] = useState<number | null>(null);
   const [currentTips, setCurrentTips] = useState<string[]>([]);
+  const [isScoringLoading, setIsScoringLoading] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const [usageInfo, setUsageInfo] = useState<ScorePanelData['usageInfo']>(null);
   const [hasLoadedScorePanelData, setHasLoadedScorePanelData] = useState(false);
@@ -661,7 +662,12 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
     }
     setCurrentScore(score);
     setCurrentTips(tips);
+    setIsScoringLoading(false);
   }, [currentScore]);
+
+  const handleScoringStart = useCallback(() => {
+    setIsScoringLoading(true);
+  }, []);
 
   // Handle message count updates from ChatWindow
   const handleMessageCountUpdate = useCallback((count: number) => {
@@ -776,6 +782,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             key={chatRefreshKey}
             personaId={resolvedParams.personaId} 
             onScoreUpdate={handleScoreUpdate}
+            onScoringStart={handleScoringStart}
             onMessageCountUpdate={handleMessageCountUpdate}
             onUsageInfoUpdate={handleUsageInfoUpdate}
           />
@@ -789,6 +796,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             tips={currentTips}
             onClearHistory={handleClearTrainingHistory}
             hasTrainingHistory={hasTrainingHistory}
+            isLoading={isScoringLoading}
           />
         </div>
       </div>
@@ -826,7 +834,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
               </button>
               
               {/* Score indicator - compact */}
-              {currentScore !== null && (
+              {currentScore !== null && currentScore !== 0 ? (
                 <button
                   onClick={() => {
                     setShowScorePanel(!showScorePanel);
@@ -843,19 +851,31 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
                   <Target className="w-3 h-3" />
                   {Math.round(currentScore)}%
                 </button>
-              )}
+              ) : isScoringLoading || currentScore === 0 ? (
+                /* Loading indicator with bouncing dots */
+                <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 rounded-full text-xs font-medium whitespace-nowrap">
+                  <Target className="w-3 h-3 text-primary" />
+                  <div className="flex space-x-0.5">
+                    <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
 
         {/* Chat Area - Full screen */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative overflow-hidden">
           <ChatWindow 
             key={chatRefreshKey}
             personaId={resolvedParams.personaId} 
             onScoreUpdate={handleScoreUpdate}
+            onScoringStart={handleScoringStart}
             onMessageCountUpdate={handleMessageCountUpdate}
             onUsageInfoUpdate={handleUsageInfoUpdate}
+            isMobile={true}
           />
         </div>
 
@@ -881,7 +901,7 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
             <div className="flex-1 overflow-y-auto px-4 py-4">
               <div className="space-y-6">
                 {/* Score Display */}
-                {currentScore !== null && (
+                {currentScore !== null && currentScore !== 0 ? (
                   <div className="text-center">
                     <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 ${
                       getScoreColor(currentScore, previousScore) === 'text-green-600' 
@@ -914,10 +934,51 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
                       </div>
                     )}
                   </div>
+                ) : currentScore === 0 ? (
+                  /* Score Loading Skeleton for Mobile */
+                  <div className="text-center">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-muted to-muted/60 animate-pulse mx-auto mb-4 flex items-center justify-center">
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-muted/80 to-muted/40 animate-pulse"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-20 bg-gradient-to-r from-muted to-muted/60 rounded animate-pulse mx-auto"></div>
+                      <div className="h-3 w-32 bg-gradient-to-r from-muted/80 to-muted/40 rounded animate-pulse mx-auto"></div>
+                    </div>
+                  </div>
+                ) : (
+                  /* No score yet */
+                  <div className="text-center">
+                    <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                      <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center ring-4 ring-muted/30">
+                        <span className="text-2xl font-bold text-muted-foreground">--</span>
+                      </div>
+                    </div>
+                    <h3 className="font-semibold text-lg mb-1 break-words">Start Chatting</h3>
+                    <p className="text-sm text-muted-foreground break-words">Your score will appear here</p>
+                  </div>
+                )}
+
+                {/* Scoring Loading Indicator */}
+                {isScoringLoading && (
+                  <div className="flex justify-center my-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md w-full">
+                      <div className="flex items-center gap-3">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-blue-800">Analyzing your response...</p>
+                          <p className="text-xs text-blue-600">Getting personalized feedback and tips</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Tips Section */}
-                {currentTips.length > 0 && (
+                {currentTips.length > 0 && !(currentTips.length === 1 && currentTips[0] === "Response generated. Scoring in progress.") ? (
                   <div>
                     <h3 className="font-semibold text-base mb-3 flex items-center gap-2">
                       <Lightbulb className="w-4 h-4 text-yellow-500" />
@@ -934,7 +995,43 @@ export default function PersonaDetailPage({ params }: PersonaDetailPageProps) {
                       ))}
                     </div>
                   </div>
-                )}
+                ) : currentTips.length === 1 && currentTips[0] === "Response generated. Scoring in progress." ? (
+                  /* Tips Loading Skeleton for Mobile */
+                  <div>
+                    <h3 className="font-semibold text-base mb-3 flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-yellow-500 animate-pulse" />
+                      Tips for Improvement
+                      <div className="flex space-x-1 ml-2">
+                        <div className="w-1 h-1 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-1 h-1 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                        <div className="w-1 h-1 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
+                      </div>
+                    </h3>
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((index) => (
+                        <div key={index} className="flex gap-3 p-3 bg-muted/50 rounded-lg">
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-muted to-muted/60 animate-pulse flex-shrink-0"></div>
+                          <div className="flex-1 space-y-2">
+                            <div 
+                              className="h-3 bg-gradient-to-r from-muted to-muted/60 rounded animate-pulse" 
+                              style={{ 
+                                width: `${Math.random() * 40 + 60}%`,
+                                animationDelay: `${index * 100}ms`
+                              }} 
+                            />
+                            <div 
+                              className="h-3 bg-gradient-to-r from-muted/80 to-muted/40 rounded animate-pulse" 
+                              style={{ 
+                                width: `${Math.random() * 30 + 40}%`,
+                                animationDelay: `${index * 150}ms`
+                              }} 
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Usage Info */}
                 {usageInfo && (

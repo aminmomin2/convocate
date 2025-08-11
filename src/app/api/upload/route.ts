@@ -16,6 +16,7 @@ const MAX_STYLE_SAMPLE_LINES = 75; // legacy soft cap (still used as a guard)
 const MAX_FILE_SIZE_MB = 1; // 1MB file size limit
 const STYLE_CHARS_BUDGET = 8000; // ~2k tokens rough budget (keeps costs stable)
 const LIMIT_CONCURRENCY = 2;
+const MIN_MESSAGES_PER_SENDER = 10; // Minimum messages needed for reliable personality analysis
 
 // In-memory throttle tracking
 const ipUsage = new Map<string, number>();
@@ -473,8 +474,35 @@ export async function POST(request: Request) {
     }
 
     const senderBuckets = groupBySender(allMsgs);
-    const selectedBuckets = selectTopSenders(senderBuckets);
+    
+    // Filter out senders with insufficient messages
+    const validSenders = Object.entries(senderBuckets).filter(([sender, messages]) => {
+      return messages.length >= MIN_MESSAGES_PER_SENDER;
+    });
+    
+    if (validSenders.length === 0) {
+      return NextResponse.json(
+        {
+          error: `No participants have enough messages for analysis. Each person needs at least ${MIN_MESSAGES_PER_SENDER} messages to create a reliable personality profile. For example, if you have a conversation with 2 people, both people need to have sent at least ${MIN_MESSAGES_PER_SENDER} messages each.`,
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Create buckets only for valid senders
+    const validBuckets = Object.fromEntries(validSenders);
+    const selectedBuckets = selectTopSenders(validBuckets);
     const selectedParticipants = Object.keys(selectedBuckets);
+    
+    // Warn about excluded senders
+    const excludedSenders = Object.entries(senderBuckets).filter(([sender, messages]) => {
+      return messages.length < MIN_MESSAGES_PER_SENDER;
+    });
+    
+    if (excludedSenders.length > 0) {
+      console.log(`Excluded ${excludedSenders.length} senders with insufficient messages:`, 
+        excludedSenders.map(([sender, messages]) => `${sender} (${messages.length} messages)`));
+    }
 
     if (used + selectedParticipants.length > MAX_PERSONAS_PER_IP) {
       return NextResponse.json(
@@ -664,12 +692,25 @@ Extract behavioral patterns that match their communication context. Return JSON 
           }
         : null;
 
+    const excludedInfo = excludedSenders.length > 0
+      ? {
+          message: `Excluded ${excludedSenders.length} participants with insufficient messages. Each person needs at least ${MIN_MESSAGES_PER_SENDER} messages to create a persona.`,
+          excludedCount: excludedSenders.length,
+          excludedParticipants: excludedSenders.map(([sender, messages]) => ({ 
+            sender, 
+            messageCount: messages.length,
+            needed: MIN_MESSAGES_PER_SENDER - messages.length
+          })),
+        }
+      : null;
+
     return NextResponse.json({
       sessionId,
       personas,
       autoSelectionInfo: null,
       totalPersonasCreated: updatedPersonas.length,
       limitInfo,
+      excludedInfo,
     });
   } catch (error) {
     // Check for OpenAI quota/billing errors in multiple formats

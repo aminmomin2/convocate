@@ -152,9 +152,21 @@ export default function Dashboard() {
               )}
             </div>
             
-            {/* Clear Data Button */}
-            {personas.length > 0 && (
-              <div className="flex gap-2">
+            {/* Navigation and Action Buttons */}
+            <div className="flex gap-2">
+              <Link href="/">
+                <Button
+                  variant="outline"
+                  className="border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:border-slate-600 cursor-pointer"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Back to Home
+                </Button>
+              </Link>
+              
+              {personas.length > 0 && (
                 <Button
                   variant="outline"
                   onClick={() => setShowClearConfirm(true)}
@@ -165,8 +177,8 @@ export default function Dashboard() {
                   </svg>
                   Clear All Data
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
