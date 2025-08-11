@@ -6,10 +6,6 @@ interface ScoringResult {
   tips: string[];
 }
 
-interface GlobalWithScoringCache {
-  scoringCache?: Map<string, Promise<ScoringResult>>;
-}
-
 declare global {
   var scoringCache: Map<string, Promise<ScoringResult>> | undefined;
 }

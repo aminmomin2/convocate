@@ -197,7 +197,7 @@ export default function PersonaSelector({
                         <Lightbulb className="w-3 h-3 mr-1" />
                         Openness
                       </div>
-                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.openness * 10}/10</p>
+                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.openness}/10</p>
                     </div>
                   )}
                   
@@ -207,7 +207,7 @@ export default function PersonaSelector({
                         <Heart className="w-3 h-3 mr-1" />
                         Expressiveness
                       </div>
-                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.expressiveness * 10}/10</p>
+                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.expressiveness}/10</p>
                     </div>
                   )}
                   
@@ -217,7 +217,7 @@ export default function PersonaSelector({
                         <Smile className="w-3 h-3 mr-1" />
                         Humor
                       </div>
-                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.humor * 10}/10</p>
+                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.humor}/10</p>
                     </div>
                   )}
                   
@@ -227,7 +227,7 @@ export default function PersonaSelector({
                         <Heart className="w-3 h-3 mr-1" />
                         Empathy
                       </div>
-                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.empathy * 10}/10</p>
+                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.empathy}/10</p>
                     </div>
                   )}
                   
@@ -237,7 +237,7 @@ export default function PersonaSelector({
                         <Target className="w-3 h-3 mr-1" />
                         Directness
                       </div>
-                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.directness * 10}/10</p>
+                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.directness}/10</p>
                     </div>
                   )}
                   
@@ -247,7 +247,7 @@ export default function PersonaSelector({
                         <Zap className="w-3 h-3 mr-1" />
                         Enthusiasm
                       </div>
-                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.enthusiasm * 10}/10</p>
+                      <p className="text-xs bg-muted/50 rounded px-2 py-1">{currentPersona.styleProfile.traits.enthusiasm}/10</p>
                     </div>
                   )}
                 </div>

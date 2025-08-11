@@ -152,7 +152,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
             try {
               const data = JSON.parse(xhr.responseText);
               resolve(data);
-            } catch (error) {
+            } catch {
               reject(new Error('Invalid response format'));
             }
           } else {

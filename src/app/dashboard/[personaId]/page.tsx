@@ -148,7 +148,7 @@ function TraitBar({ label, value }: TraitBarProps) {
             style={{ width: `${value * 100}%` }}
           ></div>
         </div>
-        <span className="text-xs text-muted-foreground">{value * 10}/10</span>
+        <span className="text-xs text-muted-foreground">{value}/10</span>
       </div>
     </div>
   );

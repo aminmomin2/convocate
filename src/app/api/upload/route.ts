@@ -476,7 +476,7 @@ export async function POST(request: Request) {
     const senderBuckets = groupBySender(allMsgs);
     
     // Filter out senders with insufficient messages
-    const validSenders = Object.entries(senderBuckets).filter(([sender, messages]) => {
+    const validSenders = Object.entries(senderBuckets).filter(([, messages]) => {
       return messages.length >= MIN_MESSAGES_PER_SENDER;
     });
     
@@ -495,7 +495,7 @@ export async function POST(request: Request) {
     const selectedParticipants = Object.keys(selectedBuckets);
     
     // Warn about excluded senders
-    const excludedSenders = Object.entries(senderBuckets).filter(([sender, messages]) => {
+    const excludedSenders = Object.entries(senderBuckets).filter(([, messages]) => {
       return messages.length < MIN_MESSAGES_PER_SENDER;
     });
     

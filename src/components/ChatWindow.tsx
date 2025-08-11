@@ -51,25 +51,6 @@ const TypingIndicator = () => (
   </div>
 );
 
-// Scoring Loading Indicator Component
-const ScoringLoadingIndicator = () => (
-  <div className="flex justify-center my-4">
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
-      <div className="flex items-center gap-3">
-        <div className="flex space-x-1">
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }}></div>
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }}></div>
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-blue-800">Analyzing your response...</p>
-          <p className="text-xs text-blue-600">Getting personalized feedback and tips</p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
 // Streaming Message Component
 const StreamingMessage = ({ content, sender, timestamp, isNewMessage = false }: { content: string; sender: 'user' | 'persona'; timestamp: Date; isNewMessage?: boolean }) => {
   const [displayedContent, setDisplayedContent] = useState('');
@@ -141,7 +122,6 @@ export default function ChatWindow({ personaId, onScoreUpdate, onScoringStart, o
   const [isLoading, setIsLoading] = useState(false);
   const [currentScore, setCurrentScore] = useState<number | null>(null);
   const [currentTips, setCurrentTips] = useState<string[]>([]);
-  const [isScoringLoading, setIsScoringLoading] = useState(false);
   const [showSamplePrompts, setShowSamplePrompts] = useState(true);
   const [error, setError] = useState<string>('');
   const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null);
@@ -394,7 +374,6 @@ export default function ChatWindow({ personaId, onScoreUpdate, onScoringStart, o
       // If we have a scoring ID, poll for results
       if (data.scoringId) {
         // Show scoring loading state
-        setIsScoringLoading(true);
         if (onScoringStart) {
           onScoringStart();
         }
@@ -407,7 +386,6 @@ export default function ChatWindow({ personaId, onScoreUpdate, onScoringStart, o
               if (scoringData.status === 'complete') {
                 setCurrentScore(scoringData.score);
                 setCurrentTips(scoringData.tips);
-                setIsScoringLoading(false);
                 
                 // Notify parent component of score/tips update
                 if (onScoreUpdate) {
@@ -415,7 +393,6 @@ export default function ChatWindow({ personaId, onScoreUpdate, onScoringStart, o
                 }
               } else if (scoringData.status === 'not_found') {
                 // Stop polling if not found
-                setIsScoringLoading(false);
                 return;
               } else {
                 // Continue polling
@@ -515,7 +492,7 @@ export default function ChatWindow({ personaId, onScoreUpdate, onScoringStart, o
           <h2 className="text-lg font-semibold">Training Session</h2>
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-muted-foreground">
-              Practice your sales skills with AI guidance
+              Practice your skills with AI guidance
             </p>
             {trainingMessageCount > 0 && (
               <Badge variant="outline" className="text-xs">
