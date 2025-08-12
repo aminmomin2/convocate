@@ -6,7 +6,7 @@ Convocate is a sophisticated Next.js application that creates AI-powered digital
 
 ## 🚀 Live Demo
 
-[Try Convocate Live](https://convocate.vercel.app) *(Coming Soon)*
+[Try Convocate Live](https://convocate.vercel.app)
 
 ## ✨ Key Features
 
