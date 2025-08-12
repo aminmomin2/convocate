@@ -4,7 +4,7 @@
  * Centralized service for all API calls to ensure consistency,
  * error handling, and maintainability across the application.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

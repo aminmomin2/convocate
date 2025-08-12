@@ -3,7 +3,7 @@
  * 
  * Landing page hero section with animated background and main call-to-action.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

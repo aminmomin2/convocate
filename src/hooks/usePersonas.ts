@@ -4,7 +4,7 @@
  * Custom hook for managing personas including loading, saving, and
  * retrieving persona data from localStorage.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

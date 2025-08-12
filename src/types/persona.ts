@@ -9,7 +9,7 @@
  * provides clear documentation of the data structures used for AI-powered
  * digital twin creation and conversation management.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  * @license MIT
  */

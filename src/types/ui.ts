@@ -4,7 +4,7 @@
  * Centralized type definitions for UI components to ensure
  * consistency and maintainability across the application.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

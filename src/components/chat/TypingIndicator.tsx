@@ -4,7 +4,7 @@
  * Shows an animated typing indicator when the AI is generating a response.
  * Uses CSS animations and a pulsing effect to indicate active processing.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

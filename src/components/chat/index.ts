@@ -4,7 +4,7 @@
  * Centralized exports for all chat-related components to enable
  * cleaner imports throughout the application.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

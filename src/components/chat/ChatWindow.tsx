@@ -13,7 +13,7 @@
  * - Persists chat history locally for privacy
  * - Provides real-time performance feedback
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  * @license MIT
  */

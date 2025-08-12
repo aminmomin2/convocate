@@ -4,7 +4,7 @@
  * Custom hook for managing file upload functionality including drag & drop,
  * file validation, upload progress, and persona creation.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

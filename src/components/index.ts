@@ -4,7 +4,7 @@
  * Main index file for all organized component directories to enable
  * clean imports throughout the application.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

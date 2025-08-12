@@ -4,7 +4,7 @@
  * Centralized location for all application constants to ensure consistency
  * and make maintenance easier.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

@@ -3,7 +3,7 @@
  * 
  * Features showcase section highlighting key capabilities.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

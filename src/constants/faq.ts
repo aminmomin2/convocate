@@ -3,7 +3,7 @@
  * 
  * Centralized FAQ data to ensure consistency and easy maintenance.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

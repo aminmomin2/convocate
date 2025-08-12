@@ -14,7 +14,7 @@
  * 5. Personality Analysis - GPT-5 powered style profiling with structured output
  * 6. Rate Limiting - IP-based protection against abuse
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  * @license MIT
  */

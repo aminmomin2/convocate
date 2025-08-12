@@ -4,7 +4,7 @@
  * Displays chat session information including training data and usage statistics.
  * Hidden on mobile for space efficiency.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

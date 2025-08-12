@@ -3,7 +3,7 @@
  * 
  * Frequently Asked Questions section with expandable answers.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

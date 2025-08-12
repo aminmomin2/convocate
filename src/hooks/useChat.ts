@@ -4,7 +4,7 @@
  * This hook encapsulates all chat-related state and logic, making components
  * cleaner and more focused on UI rendering.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

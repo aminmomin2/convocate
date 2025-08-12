@@ -352,7 +352,7 @@ docker run -p 3000:3000 -e OPENAI_API_KEY=your_key convocate
 
 2. **Clone and setup application**
    ```bash
-   git clone https://github.com/yourusername/convocate.git
+   git clone https://github.com/aminmomin2/convocate.git
    cd convocate
    npm install
    npm run build

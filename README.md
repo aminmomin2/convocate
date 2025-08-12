@@ -76,7 +76,7 @@ Convocate is a sophisticated Next.js application that creates AI-powered digital
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/convocate.git
+   git clone https://github.com/aminmomin2/convocate.git
    cd convocate
    ```
 
@@ -348,9 +348,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-- **Email**: your.email@example.com
-- **GitHub**: [@yourusername](https://github.com/yourusername)
-- **LinkedIn**: [Your Name](https://linkedin.com/in/yourusername)
+- **Email**: aminmomin2006@gmail.com
+- **GitHub**: [@aminmomin2](https://github.com/aminmomin2)
+- **LinkedIn**: [Amin Momin](https://www.linkedin.com/in/aminmomin1/)
 
 ---
 

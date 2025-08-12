@@ -4,7 +4,7 @@
  * Centralized error handling for consistent error management,
  * user feedback, and logging across the application.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

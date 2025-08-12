@@ -4,7 +4,7 @@
  * Handles file upload functionality including drag & drop, validation,
  * and persona creation. Uses the useFileUpload hook for state management.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

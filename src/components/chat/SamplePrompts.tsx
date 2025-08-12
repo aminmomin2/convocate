@@ -4,7 +4,7 @@
  * Displays sample conversation starters to help users begin chatting.
  * Provides contextually relevant prompts for practice scenarios.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

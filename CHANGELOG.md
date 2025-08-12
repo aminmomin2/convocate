@@ -163,6 +163,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Links
 
-- [GitHub Repository](https://github.com/yourusername/convocate)
+- [GitHub Repository](https://github.com/aminmomin2/convocate)
 - [Live Demo](https://convocate.vercel.app)
-- [Documentation](https://github.com/yourusername/convocate#readme)
+- [Documentation](https://github.com/aminmomin2/convocate#readme)

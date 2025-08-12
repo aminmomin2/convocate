@@ -4,7 +4,7 @@
  * Handles message input with auto-resizing textarea and send functionality.
  * Includes character count and keyboard shortcuts.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

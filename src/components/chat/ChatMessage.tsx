@@ -4,7 +4,7 @@
  * Renders individual chat messages with streaming effect for AI responses.
  * Handles both user and AI persona messages with appropriate styling.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 

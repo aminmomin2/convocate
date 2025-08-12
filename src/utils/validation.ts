@@ -4,7 +4,7 @@
  * Centralized validation functions for consistent error handling
  * and user feedback across the application.
  * 
- * @author [Your Name]
+ * @author Amin Momin
  * @version 1.0.0
  */
 
