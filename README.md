@@ -335,33 +335,6 @@ npm run build
 npm start
 ```
 
-## 📊 Performance Metrics
-
-- **Bundle Size**: ~150KB gzipped
-- **First Contentful Paint**: <1.5s
-- **Time to Interactive**: <2.5s
-- **Lighthouse Score**: 95+ across all metrics
-
-## 🔮 Roadmap
-
-### Phase 1: Core Platform ✅
-- [x] Multi-format file upload
-- [x] AI personality analysis
-- [x] Real-time chat interface
-- [x] Performance scoring
-
-### Phase 2: Advanced Features 🚧
-- [ ] Voice conversation support
-- [ ] Video call simulation
-- [ ] Team collaboration features
-- [ ] Advanced analytics dashboard
-
-### Phase 3: Enterprise Features 📋
-- [ ] CRM integration (Salesforce, HubSpot)
-- [ ] Call recording analysis
-- [ ] Sales playbook generation
-- [ ] Team training workflows
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -381,6 +354,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ by [Your Name]**
+**Built with ❤️ by Amin Momin**
 
 *Convocate - Where AI meets authentic human communication.*
