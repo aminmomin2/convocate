@@ -1,4 +1,24 @@
-// src/app/api/upload/route.ts
+/**
+ * Convocate - AI Digital Twin Platform
+ * 
+ * This file contains the core API route for uploading conversation files and creating
+ * AI-powered digital twins. It implements a sophisticated personality analysis pipeline
+ * that extracts communication patterns, behavioral traits, and writing styles from
+ * real chat conversations.
+ * 
+ * Architecture Overview:
+ * 1. File Upload & Validation - Multi-format support with size/type validation
+ * 2. Message Parsing - Intelligent extraction from various chat export formats
+ * 3. Participant Selection - Algorithm to identify the most active conversation participants
+ * 4. Message Sampling - Token-aware selection for cost-efficient AI analysis
+ * 5. Personality Analysis - GPT-5 powered style profiling with structured output
+ * 6. Rate Limiting - IP-based protection against abuse
+ * 
+ * @author [Your Name]
+ * @version 1.0.0
+ * @license MIT
+ */
+
 import { NextResponse } from "next/server";
 import Papa from "papaparse";
 import { parseStringPromise } from "xml2js";
@@ -6,43 +26,70 @@ import { openai } from "@/lib/openai";
 import type { Msg, StoredPersona, StyleProfile } from "@/types/persona";
 
 /**
- * Optimization knobs
+ * Configuration Constants
+ * 
+ * These constants control the behavior of the personality analysis pipeline.
+ * They are carefully tuned for optimal performance, cost efficiency, and user experience.
  */
-const MODEL = "gpt-5-mini"; // 👈 target ChatGPT-5 mini
+const MODEL = "gpt-5-mini"; // Target ChatGPT-5 mini for advanced personality analysis
 const TEMPERATURE = 1; // GPT-5 mini only supports default temperature of 1
 
-const MAX_PERSONAS_PER_IP = 2;
-const MAX_STYLE_SAMPLE_LINES = 75; // legacy soft cap (still used as a guard)
-const MAX_FILE_SIZE_MB = 1; // 1MB file size limit
-const STYLE_CHARS_BUDGET = 8000; // ~2k tokens rough budget (keeps costs stable)
-const LIMIT_CONCURRENCY = 2;
+// Rate limiting and usage constraints
+const MAX_PERSONAS_PER_IP = 2; // Limit to prevent abuse and ensure quality
+const MAX_STYLE_SAMPLE_LINES = 75; // Legacy soft cap for message sampling
+const MAX_FILE_SIZE_MB = 1; // 1MB file size limit for performance
+const STYLE_CHARS_BUDGET = 8000; // ~2k tokens budget to keep costs stable
+const LIMIT_CONCURRENCY = 2; // Parallel processing limit for OpenAI API calls
 const MIN_MESSAGES_PER_SENDER = 10; // Minimum messages needed for reliable personality analysis
 
-// In-memory throttle tracking
+/**
+ * In-Memory State Management
+ * 
+ * Note: In production, this should be replaced with Redis or a database
+ * for persistence across server restarts and horizontal scaling.
+ */
+// Track usage per IP address for rate limiting
 const ipUsage = new Map<string, number>();
-// Server-side persona storage to prevent deletion workaround
+// Store personas per IP to prevent deletion workarounds
 const ipPersonas = new Map<string, StoredPersona[]>();
 
-// Clean up old persona data to prevent memory leaks
-const PERSONA_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
-const MAX_PERSONA_IPS = 5000; // Prevent runaway growth
+/**
+ * Memory Management & Cleanup
+ * 
+ * Prevents memory leaks by periodically cleaning up old persona data.
+ * This is especially important for serverless environments where memory
+ * usage directly impacts costs.
+ */
+const PERSONA_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour cleanup interval
+const MAX_PERSONA_IPS = 5000; // Maximum number of IPs to track
 
+// Periodic cleanup of old persona data
 setInterval(() => {
   if (ipPersonas.size > MAX_PERSONA_IPS) {
-    // Keep only the most recent entries
+    // Keep only the most recent entries to prevent runaway growth
     const entries = Array.from(ipPersonas.entries());
     ipPersonas.clear();
     entries.slice(-MAX_PERSONA_IPS / 2).forEach(([ip, personas]) => {
       ipPersonas.set(ip, personas);
     });
-    // Cleanup completed
+    console.log(`Cleaned up ${MAX_PERSONA_IPS / 2} old persona entries`);
   }
 }, PERSONA_CLEANUP_INTERVAL);
 
-/** ---------- Small semaphore for safe parallelization ---------- */
+/**
+ * Concurrency Control - Semaphore Implementation
+ * 
+ * This implements a semaphore pattern to limit concurrent OpenAI API calls.
+ * This prevents overwhelming the API and helps manage costs by controlling
+ * the rate of expensive operations.
+ * 
+ * @param max - Maximum number of concurrent operations
+ * @returns A function that can wrap async operations with concurrency control
+ */
 function createLimiter(max: number) {
   let active = 0;
   const queue: Array<() => void> = [];
+  
   const runNext = () => {
     if (active >= max) return;
     const next = queue.shift();
@@ -50,6 +97,7 @@ function createLimiter(max: number) {
     active++;
     next();
   };
+  
   return async <T>(fn: () => Promise<T>) => {
     return new Promise<T>((resolve, reject) => {
       queue.push(async () => {
@@ -67,22 +115,47 @@ function createLimiter(max: number) {
     });
   };
 }
+
+// Create a concurrency limiter for OpenAI API calls
 const limit = createLimiter(LIMIT_CONCURRENCY);
 
-/** ---------- IP helpers ---------- */
+/**
+ * IP Address Detection
+ * 
+ * Extracts the client's real IP address from various headers.
+ * This is crucial for rate limiting and preventing abuse.
+ * Falls back to cookie-based identification if headers are unavailable.
+ * 
+ * @param request - The incoming HTTP request
+ * @returns The client's IP address or a fallback identifier
+ */
 function getClientIP(request: Request): string {
+  // Try various headers that might contain the real IP
   const xff = request.headers.get("x-forwarded-for") || "";
   const realIP = request.headers.get("x-real-ip") || "";
   const cfConnectingIP = request.headers.get("cf-connecting-ip") || "";
+  
+  // Extract the first IP from X-Forwarded-For (handles proxy chains)
   const ip = xff?.split(",")[0]?.trim() || realIP || cfConnectingIP || "unknown";
+  
   if (ip !== "unknown") return ip;
 
+  // Fallback to cookie-based identification for edge cases
   const cookie = request.headers.get("cookie") || "";
   const match = cookie.match(/client_id=([^;]+)/);
   return match ? match[1] : `unknown_${Date.now()}`;
 }
 
-/** ---------- Data utils ---------- */
+/**
+ * Message Processing Utilities
+ */
+
+/**
+ * Groups messages by sender to analyze individual communication patterns
+ * 
+ * @param msgs - Array of messages from the conversation
+ * @returns Object mapping sender names to their message arrays
+ */
 function groupBySender(msgs: Msg[]): Record<string, Msg[]> {
   return msgs.reduce((acc, m) => {
     (acc[m.sender] ||= []).push(m);
@@ -90,38 +163,66 @@ function groupBySender(msgs: Msg[]): Record<string, Msg[]> {
   }, {} as Record<string, Msg[]>);
 }
 
+/**
+ * Selects the top senders based on message count for persona creation
+ * 
+ * This algorithm prioritizes the most active participants in the conversation,
+ * as they provide the richest data for personality analysis.
+ * 
+ * @param buckets - Object mapping senders to their message arrays
+ * @returns Object containing only the top senders (up to MAX_PERSONAS_PER_IP)
+ */
 function selectTopSenders(buckets: Record<string, Msg[]>): Record<string, Msg[]> {
   const senderCounts = Object.entries(buckets).map(([sender, messages]) => ({
     sender,
     count: messages.length,
     messages,
   }));
+  
+  // Sort by message count (descending) to prioritize most active participants
   senderCounts.sort((a, b) => b.count - a.count);
+  
+  // Take only the top senders up to the persona limit
   const top = senderCounts.slice(0, MAX_PERSONAS_PER_IP);
   const out: Record<string, Msg[]> = {};
   for (const { sender, messages } of top) out[sender] = messages;
   return out;
 }
 
-/** ---------- Parsing multiple input formats ---------- */
+/**
+ * Multi-Format File Parsing
+ * 
+ * Supports various chat export formats with intelligent parsing:
+ * - WhatsApp TXT exports (most common)
+ * - CSV with structured headers
+ * - JSON arrays of message objects
+ * - SMS Backup & Restore XML format
+ * 
+ * @param files - Array of uploaded files
+ * @returns Parsed and normalized message array
+ */
 async function parseFiles(files: File[]): Promise<Msg[]> {
   const all: Msg[] = [];
 
   for (const file of files) {
+    // Validate file size
     if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
       throw new Error(`File ${file.name} is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
     }
+    
     const txt = await file.text();
     const name = file.name.toLowerCase();
 
+    // Validate file type
     if (!name.endsWith(".csv") && !name.endsWith(".json") && !name.endsWith(".txt") && !name.endsWith(".xml")) {
       throw new Error(
         `Unsupported file type: ${file.name}. Only .csv, .json, .txt, and .xml files are accepted.`
       );
     }
 
+    // Parse based on file type
     if (name.endsWith(".txt")) {
-      // WhatsApp export: [MM/DD/YY, HH:MM] Sender: Message
+      // WhatsApp export format: [MM/DD/YY, HH:MM] Sender: Message
       txt.split("\n").forEach((line) => {
         const m = line.match(/^\[(.+?)\]\s(.+?):\s(.+)$/);
         if (m) {
@@ -131,6 +232,7 @@ async function parseFiles(files: File[]): Promise<Msg[]> {
         }
       });
     } else if (name.endsWith(".csv")) {
+      // CSV format with headers: sender,message,timestamp
       const parsed = Papa.parse<{ sender: string; message: string; timestamp?: string }>(txt, {
         header: true,
         skipEmptyLines: true,
@@ -142,6 +244,7 @@ async function parseFiles(files: File[]): Promise<Msg[]> {
         }
       });
     } else if (name.endsWith(".json")) {
+      // JSON array format: [{sender, message, timestamp}]
       const arr = JSON.parse(txt);
       if (Array.isArray(arr)) {
         arr.forEach((item: { sender: string; message: string; timestamp?: string }) => {
@@ -152,6 +255,7 @@ async function parseFiles(files: File[]): Promise<Msg[]> {
         });
       }
     } else if (name.endsWith(".xml")) {
+      // SMS Backup & Restore XML format
       const xml = await parseStringPromise(txt);
       const smses = xml?.smses?.sms || [];
       smses.forEach((sms: { $: { address: string; body: string; date?: string } }) => {
@@ -164,32 +268,64 @@ async function parseFiles(files: File[]): Promise<Msg[]> {
     }
   }
 
+  // Sort messages chronologically to preserve conversation flow
   return all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 }
 
-/** ---------- Sampling (token-aware-ish, preserves chronology) ---------- */
+/**
+ * Advanced Message Sampling Algorithms
+ * 
+ * These algorithms intelligently select representative messages for AI analysis
+ * while staying within token budgets and preserving conversation context.
+ */
+
+/**
+ * Calculates a quality score for a message based on various factors
+ * 
+ * Higher quality messages provide better data for personality analysis.
+ * Factors include length, question marks, emotional indicators, and vocabulary diversity.
+ * 
+ * @param msg - The message to score
+ * @returns Quality score (higher is better)
+ */
 function calculateMessageQuality(msg: Msg): number {
   let score = 0;
   const length = msg.message.length;
+  
+  // Length scoring: optimal length is 10-200 characters
   if (length > 10 && length < 200) score += 3;
   else if (length >= 200) score += 2;
   else score += 1;
-  if (msg.message.includes("?")) score += 2;
-  if (msg.message.includes("!")) score += 1;
-  if (msg.message.includes("...")) score += 1;
+  
+  // Engagement indicators
+  if (msg.message.includes("?")) score += 2; // Questions show engagement
+  if (msg.message.includes("!")) score += 1; // Exclamations show emotion
+  if (msg.message.includes("...")) score += 1; // Ellipsis shows thoughtfulness
 
+  // Vocabulary diversity scoring
   const words = msg.message.split(/\s+/).filter(Boolean);
   const uniqueWords = new Set(words.map((w) => w.toLowerCase()));
   const diversity = words.length ? uniqueWords.size / words.length : 0;
-  score += diversity * 3;
+  score += diversity * 3; // Higher diversity = better personality data
 
+  // Casual communication indicators
   const lower = msg.message.toLowerCase();
   if (lower.includes("lol") || lower.includes("omg")) score += 1;
-  if (/[😊😂😭]/.test(msg.message)) score += 1;
+  if (/[😊😂😭]/.test(msg.message)) score += 1; // Emojis show personality
 
   return score;
 }
 
+/**
+ * Samples messages by conversation context to ensure diverse representation
+ * 
+ * This ensures we capture different types of communication patterns:
+ * questions, statements, reactions, planning, and casual conversation.
+ * 
+ * @param messages - Array of messages to sample from
+ * @param count - Number of messages to select
+ * @returns Sampled message array
+ */
 function sampleByContext(messages: Msg[], count: number): Msg[] {
   const buckets: Record<string, Msg[]> = {
     question: [],
@@ -198,6 +334,8 @@ function sampleByContext(messages: Msg[], count: number): Msg[] {
     planning: [],
     casual: [],
   };
+  
+  // Categorize messages by context
   for (const msg of messages) {
     const t = msg.message.toLowerCase();
     if (msg.message.includes("?")) buckets.question.push(msg);
@@ -207,6 +345,8 @@ function sampleByContext(messages: Msg[], count: number): Msg[] {
     if (t.includes("lol") || t.includes("yeah") || t.includes("nah") || t.includes("bro") || t.includes("dude"))
       buckets.casual.push(msg);
   }
+  
+  // Take equal samples from each category
   const per = Math.max(1, Math.ceil(count / 5));
   return [
     ...buckets.question.slice(0, per),
@@ -217,6 +357,16 @@ function sampleByContext(messages: Msg[], count: number): Msg[] {
   ].slice(0, count);
 }
 
+/**
+ * Samples messages by behavioral patterns to capture personality traits
+ * 
+ * Looks for specific behavioral indicators like proactivity, emotional expression,
+ * analytical thinking, and casual communication style.
+ * 
+ * @param messages - Array of messages to sample from
+ * @param count - Number of messages to select
+ * @returns Sampled message array
+ */
 function sampleByBehavior(messages: Msg[], count: number): Msg[] {
   const tests: Array<(m: Msg) => boolean> = [
     (m) => m.message.includes("?") || /(?:\b|^)let's\b|\bwe should\b/i.test(m.message), // proactive
@@ -225,6 +375,7 @@ function sampleByBehavior(messages: Msg[], count: number): Msg[] {
     (m) => m.message.length > 50 && /\./.test(m.message) && !m.message.includes("!"), // analytical
     (m) => /\b(bro|dude|lol)\b/i.test(m.message), // casual
   ];
+  
   const per = Math.max(1, Math.ceil(count / tests.length));
   const out: Msg[] = [];
   for (const test of tests) {
@@ -233,38 +384,67 @@ function sampleByBehavior(messages: Msg[], count: number): Msg[] {
   return out.slice(0, count);
 }
 
+/**
+ * Advanced message sampling that combines multiple strategies
+ * 
+ * This is the main sampling algorithm that:
+ * 1. Prioritizes high-quality messages (40%)
+ * 2. Ensures context diversity (30%)
+ * 3. Captures behavioral patterns (20%)
+ * 4. Includes recent messages (10%)
+ * 
+ * @param messages - Array of messages to sample from
+ * @param maxSampleSize - Maximum number of messages to select
+ * @returns Optimally sampled message array
+ */
 function advancedMessageSampling(messages: Msg[], maxSampleSize: number): Msg[] {
   if (messages.length <= maxSampleSize) return messages.slice().sort(byTime);
+  
+  // Score all messages by quality
   const scored = messages
     .map((m) => ({ m, s: calculateMessageQuality(m) }))
     .sort((a, b) => b.s - a.s)
     .map((x) => x.m);
 
   const pick: Msg[] = [];
+  
+  // Take 40% high-quality messages
   const wantHQ = Math.floor(maxSampleSize * 0.4);
   pick.push(...scored.slice(0, wantHQ));
 
+  // Take 30% context-diverse messages
   const remaining = messages.filter((m) => !pick.includes(m));
   pick.push(...sampleByContext(remaining, Math.floor(maxSampleSize * 0.3)));
 
+  // Take 20% behavior-pattern messages
   const remaining2 = messages.filter((m) => !pick.includes(m));
   pick.push(...sampleByBehavior(remaining2, Math.floor(maxSampleSize * 0.2)));
 
-  // Recent 10%
+  // Take 10% recent messages for current context
   const recent = messages.slice(-Math.floor(maxSampleSize * 0.1));
   for (const r of recent) if (!pick.includes(r)) pick.push(r);
 
-  // Deduplicate and respect char budget; then sort by time to preserve flow
+  // Deduplicate and respect character budget
   const dedup = Array.from(new Set(pick));
   const trimmed = trimByCharsBudget(dedup, STYLE_CHARS_BUDGET);
   return trimmed.sort(byTime);
 }
 
+/**
+ * Trims message array to fit within character budget
+ * 
+ * This ensures we stay within OpenAI API token limits while preserving
+ * the most important messages for personality analysis.
+ * 
+ * @param msgs - Array of messages to trim
+ * @param budget - Maximum character budget
+ * @returns Trimmed message array
+ */
 function trimByCharsBudget(msgs: Msg[], budget: number): Msg[] {
   let used = 0;
   const out: Msg[] = [];
   for (const m of msgs) {
-    const len = m.message.length + 8; // small overhead
+    const len = m.message.length + 8; // Small overhead for formatting
     if (used + len > budget) break;
     out.push(m);
     used += len;
@@ -273,11 +453,22 @@ function trimByCharsBudget(msgs: Msg[], budget: number): Msg[] {
   return out.slice(0, MAX_STYLE_SAMPLE_LINES);
 }
 
+/**
+ * Sorts messages by timestamp for chronological order
+ */
 function byTime(a: Msg, b: Msg) {
   return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
 }
 
-/** ---------- Formality Detection ---------- */
+/**
+ * Communication Formality Detection
+ * 
+ * Analyzes the overall formality level of a conversation to provide
+ * context-aware personality analysis.
+ * 
+ * @param messages - Array of messages to analyze
+ * @returns Formality level: "casual", "mixed", or "formal"
+ */
 function detectCommunicationFormality(messages: Msg[]): "casual" | "mixed" | "formal" {
   let formalityScore = 0;
   const totalMessages = messages.length;
@@ -312,7 +503,12 @@ function detectCommunicationFormality(messages: Msg[]): "casual" | "mixed" | "fo
   return "mixed";
 }
 
-/** ---------- JSON Schema once (re-used) ---------- */
+/**
+ * OpenAI JSON Schema for Structured Personality Analysis
+ * 
+ * This schema ensures consistent, structured output from GPT-5 for personality
+ * analysis. It captures 15+ dimensions of communication style and personality traits.
+ */
 const STYLE_SCHEMA = {
   name: "create_style_profile",
   schema: {
@@ -413,8 +609,12 @@ const STYLE_SCHEMA = {
   },
 } as const;
 
-/** ---------- Core route ---------- */
-// Configure API route - Match application logic
+/**
+ * API Route Configuration
+ * 
+ * Configure the API route to handle larger file uploads and set appropriate
+ * body parser limits.
+ */
 export const config = {
   api: {
     bodyParser: {
@@ -423,10 +623,19 @@ export const config = {
   },
 }
 
+/**
+ * Main Upload API Route Handler
+ * 
+ * This is the core endpoint that handles file uploads and creates AI personas.
+ * It implements a complete pipeline from file validation to personality analysis.
+ * 
+ * @param request - The incoming HTTP request with FormData
+ * @returns JSON response with created personas and metadata
+ */
 export async function POST(request: Request) {
   const ip = getClientIP(request);
 
-  // Persona limit (bugfix: >= instead of >)
+  // Check persona limit before processing
   const existingPersonas = ipPersonas.get(ip) || [];
   const used = existingPersonas.length;
   if (used >= MAX_PERSONAS_PER_IP) {
@@ -439,6 +648,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Parse form data and validate files
     const formData = await request.formData();
     const files = formData.getAll("files") as File[];
     
@@ -451,6 +661,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Too many files. Maximum 10 files allowed." }, { status: 400 });
     }
 
+    // Validate each file individually
     for (const file of files) {
       const name = file.name.toLowerCase();
       if (!name.endsWith(".csv") && !name.endsWith(".json") && !name.endsWith(".txt") && !name.endsWith(".xml")) {
@@ -467,15 +678,17 @@ export async function POST(request: Request) {
       }
     }
 
+    // Parse all files and extract messages
     const allMsgs = await parseFiles(files);
     
     if (allMsgs.length === 0) {
       return NextResponse.json({ error: "No valid messages found in uploaded files" }, { status: 400 });
     }
 
+    // Group messages by sender and select top participants
     const senderBuckets = groupBySender(allMsgs);
     
-    // Filter out senders with insufficient messages
+    // Filter out senders with insufficient messages for reliable analysis
     const validSenders = Object.entries(senderBuckets).filter(([, messages]) => {
       return messages.length >= MIN_MESSAGES_PER_SENDER;
     });
@@ -489,12 +702,12 @@ export async function POST(request: Request) {
       );
     }
     
-    // Create buckets only for valid senders
+    // Create buckets only for valid senders and select top participants
     const validBuckets = Object.fromEntries(validSenders);
     const selectedBuckets = selectTopSenders(validBuckets);
     const selectedParticipants = Object.keys(selectedBuckets);
     
-    // Warn about excluded senders
+    // Log excluded senders for debugging
     const excludedSenders = Object.entries(senderBuckets).filter(([, messages]) => {
       return messages.length < MIN_MESSAGES_PER_SENDER;
     });
@@ -504,6 +717,7 @@ export async function POST(request: Request) {
         excludedSenders.map(([sender, messages]) => `${sender} (${messages.length} messages)`));
     }
 
+    // Check if new personas would exceed the limit
     if (used + selectedParticipants.length > MAX_PERSONAS_PER_IP) {
       return NextResponse.json(
         {
@@ -513,9 +727,10 @@ export async function POST(request: Request) {
       );
     }
 
+    // Filter messages to only include selected participants and sort chronologically
     const filteredMsgs = allMsgs.filter((m) => selectedParticipants.includes(m.sender)).sort(byTime);
 
-    // Thread grouping (unchanged logic, light tidy)
+    // Group messages into conversation threads for better context
     const conversationThreads: Msg[][] = [];
     let currentThread: Msg[] = [];
     for (let i = 0; i < filteredMsgs.length; i++) {
@@ -530,6 +745,7 @@ export async function POST(request: Request) {
       const closeNext =
         nextMsg && Math.abs(new Date(nextMsg.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 5 * 60 * 1000;
 
+      // Group messages within 10 minutes of each other
       if (dt < 10 * 60 * 1000 && (msg.sender !== last.sender || closeNext)) {
         currentThread.push(msg);
       } else {
@@ -546,23 +762,28 @@ export async function POST(request: Request) {
     const conversation = conversationThreads.flat();
     const participants = selectedParticipants;
 
-    // Analyze participants with limited parallelism
+    // Analyze participants with limited parallelism to control API costs
     const personas: StoredPersona[] = [];
     let processed = 0;
     
     await Promise.all(
       participants.map((participant) => {
         return limit(async () => {
-          // respect persona cap mid-flight
+          // Respect persona cap mid-flight
           if (used + processed >= MAX_PERSONAS_PER_IP) {
             return;
           }
 
+          // Get messages for this participant
           const participantMessages = conversation.filter((m) => m.sender === participant);
+          
+          // Sample messages intelligently for cost-efficient analysis
           const styleSample = advancedMessageSampling(participantMessages, MAX_STYLE_SAMPLE_LINES);
+          
+          // Detect communication formality for context-aware analysis
           const formalityLevel = detectCommunicationFormality(participantMessages);
 
-          // Build enhanced style extraction prompt with formality awareness
+          // Build contextual analysis prompt based on formality level
           const getContextualAnalysis = (formality: string) => {
             switch (formality) {
               case "formal":
@@ -574,8 +795,10 @@ export async function POST(request: Request) {
             }
           };
 
+          // Create system prompt for personality analysis
           const system = `You are an expert in authentic communication analysis. Create a detailed personality profile that captures how this person ACTUALLY communicates. ${getContextualAnalysis(formalityLevel)}` as const;
 
+          // Create user prompt with sampled messages
           const user = `Analyze ${participant}'s authentic communication style from these ${styleSample.length} messages (${formalityLevel} context):
 
 ${styleSample.map((m, i) => `${i + 1}. ${m.message}`).join("\n")}
@@ -591,10 +814,9 @@ ${formalityLevel === "mixed" ? "- WHEN do they switch between formal and casual 
 
 Extract behavioral patterns that match their communication context. Return JSON with authentic personality insights.`;
 
-          // Use Chat Completions API with JSON schema for reliable structured output
+          // Call OpenAI API with structured output schema
           let json: StyleProfile | null = null;
           try {
-            
             const res = await openai.chat.completions.create({
               model: MODEL,
               temperature: TEMPERATURE,
@@ -620,11 +842,11 @@ Extract behavioral patterns that match their communication context. Return JSON 
               }
             }
           } catch {
-            // If schema gen fails for any reason, fall back to safe defaults
+            // Fall back to safe defaults if API call fails
             json = null;
           }
 
-          // Defaulting/normalization with formality context
+          // Create default style profile with formality context
           const styleProfile: StyleProfile =
             json ?? ({
               tone: "Neutral and professional",
@@ -662,11 +884,12 @@ Extract behavioral patterns that match their communication context. Return JSON 
             styleProfile.formality_context = formalityLevel;
           }
 
+          // Create the persona object
           const persona: StoredPersona = {
             id: participant,
             name: participant,
             messageCount: participantMessages.length,
-            transcript: conversation, // full convo
+            transcript: conversation, // Full conversation for context
             chatHistory: [],
             styleProfile,
           };
@@ -677,10 +900,12 @@ Extract behavioral patterns that match their communication context. Return JSON 
       })
     );
 
+    // Update stored personas and usage tracking
     const updatedPersonas = [...existingPersonas, ...personas].slice(0, MAX_PERSONAS_PER_IP);
     ipPersonas.set(ip, updatedPersonas);
     ipUsage.set(ip, updatedPersonas.length);
 
+    // Generate response metadata
     const sessionId = Date.now().toString();
     const skippedCount = selectedParticipants.length - personas.length;
     const limitInfo =
@@ -704,6 +929,7 @@ Extract behavioral patterns that match their communication context. Return JSON 
         }
       : null;
 
+    // Return successful response with created personas
     return NextResponse.json({
       sessionId,
       personas,
@@ -713,7 +939,7 @@ Extract behavioral patterns that match their communication context. Return JSON 
       excludedInfo,
     });
   } catch (error) {
-    // Check for OpenAI quota/billing errors in multiple formats
+    // Handle OpenAI quota/billing errors specifically
     const isQuotaError = (err: unknown): boolean => {
       if (!(err instanceof Error)) return false;
       
@@ -741,6 +967,8 @@ Extract behavioral patterns that match their communication context. Return JSON 
         { status: 503 }
       );
     }
+    
+    // Return generic error response
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }

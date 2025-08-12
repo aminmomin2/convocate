@@ -20,11 +20,11 @@
 
 import React, { useRef, useEffect } from 'react';
 import { useChat } from '@/hooks/useChat';
-import { ChatHeader } from './chat/ChatHeader';
-import { ChatMessage } from './chat/ChatMessage';
-import { TypingIndicator } from './chat/TypingIndicator';
-import { ChatInput } from './chat/ChatInput';
-import { SamplePrompts } from './chat/SamplePrompts';
+import { ChatHeader } from './ChatHeader';
+import { ChatMessage } from './ChatMessage';
+import { TypingIndicator } from './TypingIndicator';
+import { ChatInput } from './ChatInput';
+import { SamplePrompts } from './SamplePrompts';
 
 interface ChatWindowProps {
   personaId: string;
