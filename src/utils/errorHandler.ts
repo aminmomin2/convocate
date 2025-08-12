@@ -40,7 +40,7 @@ export interface ErrorInfo {
   message: string;
   userMessage: string;
   code?: string;
-  details?: any;
+  details?: unknown;
 }
 
 /**
@@ -54,7 +54,7 @@ class ErrorHandler {
     error: Error | string,
     type: ErrorType = ErrorType.UNKNOWN,
     severity: ErrorSeverity = ErrorSeverity.MEDIUM,
-    details?: any
+    details?: unknown
   ): ErrorInfo {
     const message = typeof error === 'string' ? error : error.message;
     
@@ -128,12 +128,14 @@ class ErrorHandler {
   /**
    * Handle API errors specifically
    */
-  handleApiError(error: any): ErrorInfo {
+  handleApiError(error: unknown): ErrorInfo {
     let type = ErrorType.API;
     let severity = ErrorSeverity.MEDIUM;
     
-    if (error?.response?.status) {
-      const status = error.response.status;
+    // Type guard to check if error has response property
+    const apiError = error as { response?: { status?: number } };
+    if (apiError?.response?.status) {
+      const status = apiError.response.status;
       
       if (status >= 500) {
         severity = ErrorSeverity.HIGH;
@@ -146,7 +148,7 @@ class ErrorHandler {
     }
     
     const errorInfo = this.createErrorInfo(
-      error.message || 'API request failed',
+      (error as Error)?.message || 'API request failed',
       type,
       severity,
       error
@@ -159,7 +161,7 @@ class ErrorHandler {
   /**
    * Handle validation errors
    */
-  handleValidationError(message: string, details?: any): ErrorInfo {
+  handleValidationError(message: string, details?: unknown): ErrorInfo {
     const errorInfo = this.createErrorInfo(
       message,
       ErrorType.VALIDATION,
@@ -277,8 +279,8 @@ export const errorUtils = {
   /**
    * Check if error is a quota error
    */
-  isQuotaError: (error: any): boolean => {
-    const message = (error?.message || '').toLowerCase();
+  isQuotaError: (error: unknown): boolean => {
+    const message = ((error as Error)?.message || '').toLowerCase();
     return message.includes('quota') || message.includes('limit');
   },
 };

@@ -58,18 +58,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   // Use custom hook for all chat logic
   const {
     messages,
-    currentPersona,
     trainingMessageCount,
     isLoading,
     isTyping,
     error,
     showSamplePrompts,
-    currentScore,
-    currentTips,
     usageInfo,
     newMessageIds,
     sendMessage,
-    clearError,
     hideSamplePrompts,
   } = useChat({
     personaId,
@@ -102,7 +98,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
    * Handle clicking on sample prompts
    * Fills the input field with the selected prompt
    */
-  const handleSamplePromptClick = (prompt: string) => {
+  const handleSamplePromptClick = () => {
     // This would need to be handled by the ChatInput component
     // For now, we'll just hide the prompts
     hideSamplePrompts();

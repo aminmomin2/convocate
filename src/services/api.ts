@@ -9,7 +9,6 @@
  */
 
 import { StoredPersona, Msg, StyleProfile } from '@/types/persona';
-import { API_CONFIG } from '@/constants';
 
 // API Response Types
 interface ChatResponse {

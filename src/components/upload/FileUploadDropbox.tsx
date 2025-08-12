@@ -43,7 +43,6 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
     selectedFiles,
     currentStep,
     uploadedPersonas,
-    sessionId,
     error,
     uploadProgress,
     uploadStatus,
@@ -54,7 +53,6 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
     removeFile,
     clearFiles,
     uploadFiles,
-    updatePersonaNames,
     savePersonas,
     reset,
   } = useFileUpload({ onUploadSuccess });
@@ -70,8 +68,8 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
     return (
       <PersonaNaming
         personas={uploadedPersonas}
-        onSave={savePersonas}
-        onBack={reset}
+        onComplete={savePersonas}
+        onCancel={reset}
       />
     );
   }

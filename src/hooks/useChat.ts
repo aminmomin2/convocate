@@ -305,7 +305,7 @@ export const useChat = ({
     } finally {
       setIsLoading(false);
     }
-  }, [currentPersona, messages, currentScore, isLoading, saveChatHistory, onScoreUpdate, onScoringStart, onMessageCountUpdate, onUsageInfoUpdate]);
+  }, [currentPersona, messages, currentScore, currentTips, isLoading, saveChatHistory, onScoreUpdate, onScoringStart, onMessageCountUpdate, onUsageInfoUpdate]);
 
   /**
    * Clear error state

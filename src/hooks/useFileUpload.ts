@@ -12,7 +12,6 @@ import { useState, useCallback } from 'react';
 import { StoredPersona } from '@/types/persona';
 import { apiService } from '@/services/api';
 import { fileValidation } from '@/utils/validation';
-import { FILE_CONFIG } from '@/constants';
 
 interface UseFileUploadProps {
   onUploadSuccess?: (data: { sessionId: string; personas: StoredPersona[] }) => void;
@@ -146,7 +145,8 @@ export const useFileUpload = ({ onUploadSuccess }: UseFileUploadProps) => {
     try {
       // Simulate upload progress
       const progressInterval = setInterval(() => {
-        updateState(prev => ({
+        setState(prev => ({
+          ...prev,
           uploadProgress: Math.min(prev.uploadProgress + 10, 90),
           uploadStatus: 'Processing files...',
         }));
