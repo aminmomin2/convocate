@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tag } from '@/components/ui/tag';
+import { IconLabel } from '@/components/ui/icon-label';
+import { HStack, VStack } from '@/components/ui/stack';
+import { PersonaAvatar } from '@/components/ui/avatar';
 import { ArrowLeft, MessageCircle, Palette, Clock, BookOpen, Sparkles, Heart, Brain, Users, Zap, Target, MessageSquare, BarChart3, Smile, AlertTriangle, Lightbulb, Shield } from 'lucide-react';
 import { StoredPersona } from '@/types/persona';
 
@@ -62,11 +66,11 @@ export default function PersonaSelector({
         <CardHeader className={`${isMobile ? 'pb-2' : ''}`}>
           <div className="flex items-center gap-3">
             {/* Avatar */}
-            <div className={`${isMobile ? 'w-10 h-10' : 'w-16 h-16'} rounded-full bg-primary/10 flex items-center justify-center`}>
-              <span className={`text-primary font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>
-                {name.charAt(0)}
-              </span>
-            </div>
+            <PersonaAvatar 
+              src={null} 
+              name={name} 
+              size={isMobile ? 'sm' : 'lg'}
+            />
             
             <div className="flex-1 min-w-0">
               <CardTitle className={`${isMobile ? 'text-base' : 'text-xl'} truncate`}>
@@ -277,55 +281,53 @@ export default function PersonaSelector({
                       <Heart className="w-3 h-3 mr-1" />
                       Secondary Emotions
                     </div>
-                    <div className="flex flex-wrap gap-1">
+                    <HStack wrap spacing="xs">
                       {currentPersona.styleProfile.emotions.secondary.map((emotion, index) => (
-                        <span key={index} className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-1 capitalize">
+                        <Tag key={index} variant="blue" size="sm" className="capitalize">
                           {emotion}
-                        </span>
+                        </Tag>
                       ))}
-                    </div>
+                    </HStack>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.emotions.triggers?.positive && currentPersona.styleProfile.emotions.triggers.positive.length > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <Lightbulb className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<Lightbulb className="w-3 h-3" />} size="sm" variant="muted">
                       Positive Triggers
-                    </div>
-                    <div className="flex flex-wrap gap-1">
+                    </IconLabel>
+                    <HStack wrap spacing="xs">
                       {currentPersona.styleProfile.emotions.triggers.positive.slice(0, 4).map((trigger, index) => (
-                        <span key={index} className="text-xs bg-green-100 text-green-700 rounded px-2 py-1">
+                        <Tag key={index} variant="green" size="sm">
                           {trigger}
-                        </span>
+                        </Tag>
                       ))}
                       {currentPersona.styleProfile.emotions.triggers.positive.length > 4 && (
                         <span className="text-xs text-muted-foreground px-2 py-1">
                           +{currentPersona.styleProfile.emotions.triggers.positive.length - 4} more
                         </span>
                       )}
-                    </div>
+                    </HStack>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.emotions.triggers?.negative && currentPersona.styleProfile.emotions.triggers.negative.length > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <AlertTriangle className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<AlertTriangle className="w-3 h-3" />} size="sm" variant="muted">
                       Negative Triggers
-                    </div>
-                    <div className="flex flex-wrap gap-1">
+                    </IconLabel>
+                    <HStack wrap spacing="xs">
                       {currentPersona.styleProfile.emotions.triggers.negative.slice(0, 4).map((trigger, index) => (
-                        <span key={index} className="text-xs bg-red-100 text-red-700 rounded px-2 py-1">
+                        <Tag key={index} variant="red" size="sm">
                           {trigger}
-                        </span>
+                        </Tag>
                       ))}
                       {currentPersona.styleProfile.emotions.triggers.negative.length > 4 && (
                         <span className="text-xs text-muted-foreground px-2 py-1">
                           +{currentPersona.styleProfile.emotions.triggers.negative.length - 4} more
                         </span>
                       )}
-                    </div>
+                    </HStack>
                   </div>
                 )}
               </div>
@@ -340,53 +342,50 @@ export default function PersonaSelector({
                 
                 {currentPersona.styleProfile.preferences.topics && currentPersona.styleProfile.preferences.topics.length > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <MessageSquare className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<MessageSquare className="w-3 h-3" />} size="sm" variant="muted">
                       Preferred Topics
-                    </div>
-                    <div className="flex flex-wrap gap-1">
+                    </IconLabel>
+                    <HStack wrap spacing="xs">
                       {currentPersona.styleProfile.preferences.topics.slice(0, 5).map((topic, index) => (
-                        <span key={index} className="text-xs bg-purple-100 text-purple-700 rounded px-2 py-1">
+                        <Tag key={index} variant="purple" size="sm">
                           {topic}
-                        </span>
+                        </Tag>
                       ))}
                       {currentPersona.styleProfile.preferences.topics.length > 5 && (
                         <span className="text-xs text-muted-foreground px-2 py-1">
                           +{currentPersona.styleProfile.preferences.topics.length - 5} more
                         </span>
                       )}
-                    </div>
+                    </HStack>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.preferences.avoids && currentPersona.styleProfile.preferences.avoids.length > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <Shield className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<Shield className="w-3 h-3" />} size="sm" variant="muted">
                       Avoids
-                    </div>
-                    <div className="flex flex-wrap gap-1">
+                    </IconLabel>
+                    <HStack wrap spacing="xs">
                       {currentPersona.styleProfile.preferences.avoids.slice(0, 4).map((avoid, index) => (
-                        <span key={index} className="text-xs bg-orange-100 text-orange-700 rounded px-2 py-1">
+                        <Tag key={index} variant="orange" size="sm">
                           {avoid}
-                        </span>
+                        </Tag>
                       ))}
                       {currentPersona.styleProfile.preferences.avoids.length > 4 && (
                         <span className="text-xs text-muted-foreground px-2 py-1">
                           +{currentPersona.styleProfile.preferences.avoids.length - 4} more
                         </span>
                       )}
-                    </div>
+                    </HStack>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.preferences.engagement && currentPersona.styleProfile.preferences.engagement.length > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <Users className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<Users className="w-3 h-3" />} size="sm" variant="muted">
                       Engagement Style
-                    </div>
-                    <div className="space-y-1">
+                    </IconLabel>
+                    <VStack spacing="xs">
                       {currentPersona.styleProfile.preferences.engagement.slice(0, 3).map((style, index) => (
                         <p key={index} className="text-xs bg-muted/50 rounded px-2 py-1">• {style}</p>
                       ))}
@@ -395,7 +394,7 @@ export default function PersonaSelector({
                           +{currentPersona.styleProfile.preferences.engagement.length - 3} more styles
                         </p>
                       )}
-                    </div>
+                    </VStack>
                   </div>
                 )}
               </div>
@@ -410,73 +409,68 @@ export default function PersonaSelector({
                 
                 {currentPersona.styleProfile.communication_patterns.message_length && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <BarChart3 className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<BarChart3 className="w-3 h-3" />} size="sm" variant="muted">
                       Message Length
-                    </div>
+                    </IconLabel>
                     <p className="text-xs bg-muted/50 rounded px-2 py-1 capitalize">{currentPersona.styleProfile.communication_patterns.message_length}</p>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.communication_patterns.punctuation_style && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <MessageCircle className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<MessageCircle className="w-3 h-3" />} size="sm" variant="muted">
                       Punctuation Style
-                    </div>
+                    </IconLabel>
                     <p className="text-xs bg-muted/50 rounded px-2 py-1 capitalize">{currentPersona.styleProfile.communication_patterns.punctuation_style}</p>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.communication_patterns.capitalization && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <BookOpen className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<BookOpen className="w-3 h-3" />} size="sm" variant="muted">
                       Capitalization
-                    </div>
+                    </IconLabel>
                     <p className="text-xs bg-muted/50 rounded px-2 py-1 capitalize">{currentPersona.styleProfile.communication_patterns.capitalization}</p>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.communication_patterns.abbreviations && currentPersona.styleProfile.communication_patterns.abbreviations.length > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <Sparkles className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<Sparkles className="w-3 h-3" />} size="sm" variant="muted">
                       Common Abbreviations
-                    </div>
-                    <div className="flex flex-wrap gap-1">
+                    </IconLabel>
+                    <HStack wrap spacing="xs">
                       {currentPersona.styleProfile.communication_patterns.abbreviations.slice(0, 6).map((abbrev, index) => (
-                        <span key={index} className="text-xs bg-indigo-100 text-indigo-700 rounded px-2 py-1">
+                        <Tag key={index} variant="indigo" size="sm">
                           {abbrev}
-                        </span>
+                        </Tag>
                       ))}
                       {currentPersona.styleProfile.communication_patterns.abbreviations.length > 6 && (
                         <span className="text-xs text-muted-foreground px-2 py-1">
                           +{currentPersona.styleProfile.communication_patterns.abbreviations.length - 6} more
                         </span>
                       )}
-                    </div>
+                    </HStack>
                   </div>
                 )}
 
                 {currentPersona.styleProfile.communication_patterns.unique_expressions && currentPersona.styleProfile.communication_patterns.unique_expressions.length > 0 && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-xs font-medium text-muted-foreground">
-                      <Brain className="w-3 h-3 mr-1" />
+                    <IconLabel icon={<Brain className="w-3 h-3" />} size="sm" variant="muted">
                       Unique Expressions
-                    </div>
-                    <div className="flex flex-wrap gap-1">
+                    </IconLabel>
+                    <HStack wrap spacing="xs">
                       {currentPersona.styleProfile.communication_patterns.unique_expressions.slice(0, 6).map((expr, index) => (
-                        <span key={index} className="text-xs bg-teal-100 text-teal-700 rounded px-2 py-1">
+                        <Tag key={index} variant="teal" size="sm">
                           {expr}
-                        </span>
+                        </Tag>
                       ))}
                       {currentPersona.styleProfile.communication_patterns.unique_expressions.length > 6 && (
                         <span className="text-xs text-muted-foreground px-2 py-1">
                           +{currentPersona.styleProfile.communication_patterns.unique_expressions.length - 6} more
                         </span>
                       )}
-                    </div>
+                    </HStack>
                   </div>
                 )}
               </div>

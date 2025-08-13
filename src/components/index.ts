@@ -1,25 +1,26 @@
 /**
  * Components Index
- * 
- * Main index file for all organized component directories to enable
- * clean imports throughout the application.
- * 
+ *
+ * Centralized exports for all components.
+ *
  * @author Amin Momin
  * @version 1.0.0
  */
 
+// Layout components
+export * from './layout';
+
+// Landing components
+export * from './landing';
+
 // Chat components
 export * from './chat';
 
-// Landing page components
-export * from './landing';
+// Dashboard components
+export * from './dashboard';
 
-// Upload components
-export * from './upload';
+// Out-of-credits components
+export * from './out-of-credits';
 
-// Individual components (if not organized into directories yet)
-export { default as ChatWindow } from './ChatWindow';
-export { default as FileUploadDropbox } from './upload/FileUploadDropbox';
-export { default as PersonaSelector } from './PersonaSelector';
-export { default as ScorePanel } from './ScorePanel';
-export { default as PersonaNaming } from './PersonaNaming';
+// UI components
+export * from './ui';

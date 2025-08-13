@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { TextSkeleton } from '@/components/ui/loading-skeleton';
 import { Lightbulb, Target, Trash2 } from 'lucide-react';
 
 interface ScorePanelProps {
@@ -58,21 +59,8 @@ export default function ScorePanel({
       {[1, 2, 3].map((index) => (
         <div key={index} className="flex items-start gap-2">
           <div className={`${isMobile ? 'w-3 h-3' : 'w-5 h-5'} rounded-full bg-gradient-to-br from-muted to-muted/60 animate-pulse flex-shrink-0`} />
-          <div className="flex-1 space-y-1">
-            <div 
-              className={`${isMobile ? 'h-2' : 'h-3'} bg-gradient-to-r from-muted to-muted/60 rounded animate-pulse`} 
-              style={{ 
-                width: `${Math.random() * 40 + 60}%`,
-                animationDelay: `${index * 100}ms`
-              }} 
-            />
-            <div 
-              className={`${isMobile ? 'h-2' : 'h-3'} bg-gradient-to-r from-muted/80 to-muted/40 rounded animate-pulse`} 
-              style={{ 
-                width: `${Math.random() * 30 + 40}%`,
-                animationDelay: `${index * 150}ms`
-              }} 
-            />
+          <div className="flex-1">
+            <TextSkeleton lines={2} className="space-y-1" />
           </div>
         </div>
       ))}

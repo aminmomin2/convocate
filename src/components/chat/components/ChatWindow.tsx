@@ -20,11 +20,12 @@
 
 import React, { useRef, useEffect } from 'react';
 import { useChat } from '@/hooks/useChat';
-import { ChatHeader } from './chat/ChatHeader';
-import { ChatMessage } from './chat/ChatMessage';
-import { TypingIndicator } from './chat/TypingIndicator';
-import { ChatInput } from './chat/ChatInput';
-import { SamplePrompts } from './chat/SamplePrompts';
+import { ErrorMessage } from '@/components/ui/error-message';
+import { ChatHeader } from './ChatHeader';
+import { ChatMessage } from './ChatMessage';
+import { TypingIndicator } from './TypingIndicator';
+import { ChatInput } from './ChatInput';
+import { SamplePrompts } from './SamplePrompts';
 
 interface ChatWindowProps {
   personaId: string;
@@ -99,6 +100,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
    * Fills the input field with the selected prompt
    */
   const handleSamplePromptClick = () => {
+    // This would need to be handled by the ChatInput component
+    // For now, we'll just hide the prompts
     hideSamplePrompts();
   };
 
@@ -122,15 +125,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       >
         {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <div className="flex items-center gap-2 text-red-800 mb-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="font-medium">Chat Error</span>
-            </div>
-            <p className="text-red-700 text-sm">{error}</p>
-          </div>
+          <ErrorMessage 
+            title="Chat Error" 
+            message={error} 
+            variant="compact"
+            className="mb-4"
+          />
         )}
 
         {/* Sample Prompts Section */}

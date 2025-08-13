@@ -1,8 +1,18 @@
 "use client"
 import React, { useState, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Button,
+  Badge,
+  Progress,
+  Spinner,
+  Alert
+} from '@/components/ui';
+import { ErrorMessage } from '@/components/ui/error-message';
 import PersonaNaming from './PersonaNaming';
 
 import { Msg, StoredPersona } from '@/types/persona';
@@ -14,21 +24,7 @@ interface FileUploadDropboxProps {
   onUploadSuccess?: (data: { sessionId: string; personas: StoredPersona[] }) => void;
 }
 
-// Progress Bar Component
-const ProgressBar = ({ progress, status }: { progress: number; status: string }) => (
-  <div className="w-full space-y-2">
-    <div className="flex justify-between text-xs text-muted-foreground">
-      <span>{status}</span>
-      <span>{Math.round(progress)}%</span>
-    </div>
-    <div className="w-full bg-muted rounded-full h-2">
-      <div 
-        className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
-        style={{ width: `${progress}%` }}
-      />
-    </div>
-  </div>
-);
+
 
 export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropboxProps) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -308,44 +304,34 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
       <CardContent className="space-y-4">
         {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-red-800">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="font-medium text-sm">Upload Error</span>
-            </div>
-            <p className="text-red-700 text-xs mt-1">{error}</p>
-          </div>
+          <ErrorMessage 
+            title="Upload Error" 
+            message={error}
+            variant="compact"
+          />
         )}
 
         {/* Compact Usage Limits Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="flex items-center gap-2 text-blue-800 mb-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="font-medium text-sm">Usage Limits</span>
-          </div>
-          <div className="text-blue-700 text-xs space-y-1">
+        <Alert variant="info" title="Usage Limits">
+          <div className="space-y-1">
             <p>• <strong>2 personas total per IP</strong>: yourself + one other person</p>
             <p>• <strong>This limit is permanent</strong> - cannot be reset by deleting personas</p>
             <p>• 40 total messages per IP address</p>
             <p>• Maximum file size: {MAX_FILE_SIZE_MB}MB per file</p>
             <p>• Best results with 50-100 total chat lines per persona</p>
           </div>
-        </div>
+        </Alert>
 
         {/* Dropzone */}
         <div
           className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-            isDragOver 
-              ? 'border-primary bg-primary/5' 
+            isDragOver
+              ? 'border-primary bg-primary/5'
               : 'border-muted-foreground/25 hover:border-muted-foreground/50'
           }`}
+          onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
           onClick={() => document.getElementById('file-input')?.click()}
         >
           <div className="space-y-3">
@@ -374,20 +360,29 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
         {/* Selected Files */}
         {selectedFiles.length > 0 && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
+            <h4 className="text-xs font-medium">Selected Files</h4>
+            <div className="space-y-2">
               {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-1 bg-muted/50 hover:bg-muted/70 rounded-full px-2 py-1 text-xs transition-colors group">
-                  <span className="truncate max-w-20">{file.name}</span>
-                  <button
+                <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {file.name.split('.').pop()?.toUpperCase()}
+                    </Badge>
+                    <span className="text-sm truncate">{file.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => removeFile(index)}
-                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full w-4 h-4 flex items-center justify-center transition-all duration-200 ml-1 cursor-pointer"
-                    title="Remove file"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                   >
-                    ×
-                  </button>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -418,7 +413,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
         {/* Progress Bar - Show during upload */}
         {isUploading && (
           <div className="space-y-3">
-            <ProgressBar progress={uploadProgress} status={uploadStatus} />
+            <Progress progress={uploadProgress} status={uploadStatus} />
             <div className="text-center text-xs text-muted-foreground">
               This may take 10-30 seconds depending on file size and conversation length
             </div>
@@ -434,10 +429,7 @@ export default function FileUploadDropbox({ onUploadSuccess }: FileUploadDropbox
         >
           {isUploading ? (
             <>
-              <svg className="animate-spin -ml-1 mr-3 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <Spinner size="sm" className="-ml-1 mr-3" />
               Please wait...
             </>
           ) : (

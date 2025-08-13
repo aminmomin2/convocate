@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui';
 
 export const TypingIndicator: React.FC = () => (
   <div className="flex justify-start">
@@ -26,12 +26,11 @@ export const TypingIndicator: React.FC = () => (
         </span>
       </div>
       <div className="flex items-center space-x-1">
-        <div className="flex space-x-1">
-          {/* Animated dots with staggered delays for natural typing effect */}
-          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-        </div>
+                        <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
         <span className="text-xs text-muted-foreground ml-2">AI is typing...</span>
       </div>
     </div>

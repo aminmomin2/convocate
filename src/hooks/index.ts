@@ -9,5 +9,5 @@
  */
 
 export { useChat } from './useChat';
-export { useFileUpload } from './useFileUpload';
+
 export { usePersonas } from './usePersonas';

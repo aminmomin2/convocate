@@ -1,16 +1,14 @@
 /**
  * Chat Components Index
- * 
- * Centralized exports for all chat-related components to enable
- * cleaner imports throughout the application.
- * 
+ *
+ * Centralized exports for all chat-related components.
+ *
  * @author Amin Momin
  * @version 1.0.0
  */
 
-export { default as ChatWindow } from './ChatWindow';
-export { ChatMessage } from './ChatMessage';
-export { TypingIndicator } from './TypingIndicator';
-export { ChatInput } from './ChatInput';
-export { SamplePrompts } from './SamplePrompts';
-export { ChatHeader } from './ChatHeader';
+// Main chat page component
+export { default as ChatPage } from './ChatPage';
+
+// All individual components
+export * from './components';

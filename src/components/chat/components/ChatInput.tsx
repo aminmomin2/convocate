@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, Spinner } from '@/components/ui';
 import { Send } from 'lucide-react';
 
 interface ChatInputProps {
@@ -80,7 +80,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         >
           {isLoading ? (
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <Spinner size="sm" />
               <span className="text-xs">AI thinking...</span>
             </div>
           ) : (
